@@ -1,0 +1,251 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase';
+import type { EmailSubscriber } from '@/lib/types';
+import { motion } from 'framer-motion';
+import { Search, UserCheck, Clock, Send, Plus } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+export default function MembershipPage() {
+    const supabase = createClient();
+    const [subscribers, setSubscribers] = useState<EmailSubscriber[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+    const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+        setToast({ text, type });
+        setTimeout(() => setToast(null), 3200);
+    };
+
+    useEffect(() => {
+        fetchSubscribers();
+    }, []);
+
+    async function fetchSubscribers() {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('email_subscribers')
+            .select('*')
+            .order('issued_at', { ascending: false });
+        if (!error && data) setSubscribers(data);
+        setLoading(false);
+    }
+
+    async function recordVisit(subscriber: EmailSubscriber) {
+        setActionLoading(`visit-${subscriber.id}`);
+        try {
+            const res = await fetch('/api/wallet/record-visit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriber_id: subscriber.id, action: 'record_visit' }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setSubscribers(prev =>
+                    prev.map(s => s.id === subscriber.id
+                        ? { ...s, visit_count: data.visit_count, last_visit_at: new Date().toISOString() }
+                        : s
+                    )
+                );
+                showToast(`Visit recorded — ${subscriber.name} now has ${data.visit_count} visit${data.visit_count === 1 ? '' : 's'}. Google Wallet updated.`);
+            } else {
+                showToast(data.error || 'Failed to record visit', 'error');
+            }
+        } catch {
+            showToast('Network error', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function sendUpdatedPass(subscriber: EmailSubscriber) {
+        setActionLoading(`pass-${subscriber.id}`);
+        try {
+            const res = await fetch('/api/wallet/record-visit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriber_id: subscriber.id, action: 'send_updated_pass' }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast(`Updated Apple pass sent to ${subscriber.email}`);
+            } else {
+                showToast(data.error || 'Failed to send pass', 'error');
+            }
+        } catch {
+            showToast('Network error', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    const filtered = subscribers.filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.email.toLowerCase().includes(search.toLowerCase()) ||
+        (s.phone && s.phone.includes(search))
+    );
+
+    const totalVisits = subscribers.reduce((sum, s) => sum + s.visit_count, 0);
+
+    return (
+        <div className="min-h-screen bg-savron-black text-white">
+            {/* Toast */}
+            {toast && (
+                <motion.div
+                    initial={{ opacity: 0, y: -16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -16 }}
+                    style={{
+                        position: 'fixed', top: 24, right: 24, zIndex: 9999,
+                        background: toast.type === 'success' ? 'rgba(30,50,35,0.95)' : 'rgba(60,20,20,0.95)',
+                        border: `1px solid ${toast.type === 'success' ? 'rgba(120,200,120,0.2)' : 'rgba(200,80,80,0.2)'}`,
+                        color: toast.type === 'success' ? 'rgba(175,215,170,0.9)' : 'rgba(220,130,130,0.9)',
+                        padding: '14px 20px', maxWidth: 380,
+                        fontSize: 12, fontWeight: 300, letterSpacing: '0.05em',
+                        backdropFilter: 'blur(12px)',
+                    }}
+                >
+                    {toast.text}
+                </motion.div>
+            )}
+
+            <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-12">
+
+                {/* Header */}
+                <div className="mb-10">
+                    <p className="text-[10px] uppercase tracking-[0.35em] text-white/25 mb-3">
+                        Membership
+                    </p>
+                    <h1 className="font-heading text-3xl md:text-4xl text-white uppercase tracking-wider mb-2">
+                        E-Pass Subscribers
+                    </h1>
+                    <p className="text-sm text-white/40 font-light">
+                        Manage digital passes, record visits, and track engagement.
+                    </p>
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mb-10">
+                    {[
+                        { icon: UserCheck, label: "Total Subscribers", value: subscribers.length.toString() },
+                        { icon: Plus, label: "Total Visits Recorded", value: totalVisits.toString() },
+                        { icon: Clock, label: "This Month", value: subscribers.filter(s => {
+                            const d = new Date(s.issued_at);
+                            const now = new Date();
+                            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                        }).length.toString() },
+                    ].map(({ icon: Icon, label, value }) => (
+                        <div key={label} className="bg-white/[0.02] border border-white/[0.06] p-6">
+                            <div className="flex items-center gap-3 mb-3">
+                                <Icon size={14} className="text-white/30" />
+                                <p className="text-[10px] uppercase tracking-[0.25em] text-white/30">{label}</p>
+                            </div>
+                            <p className="text-3xl font-light text-white">{value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Search */}
+                <div className="relative mb-6">
+                    <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
+                    <input
+                        type="text"
+                        placeholder="Search by name, email, or phone…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full bg-white/[0.03] border border-white/[0.08] text-white placeholder-white/25 pl-10 pr-4 py-3 text-sm font-light tracking-wide focus:outline-none focus:border-white/20 transition-colors"
+                    />
+                </div>
+
+                {/* Table */}
+                {loading ? (
+                    <div className="text-center py-20 text-white/30 text-sm tracking-widest uppercase">Loading…</div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-center py-20 text-white/25 text-sm tracking-widest uppercase">
+                        {search ? 'No results found' : 'No subscribers yet'}
+                    </div>
+                ) : (
+                    <div className="border border-white/[0.07]">
+                        {/* Header row */}
+                        <div className="grid gap-4 px-6 py-3 border-b border-white/[0.05]"
+                            style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 160px" }}
+                        >
+                            {['Name', 'Email', 'Phone', 'Visits', 'Joined', 'Actions'].map(h => (
+                                <p key={h} className="text-[9px] uppercase tracking-[0.3em] text-white/25">{h}</p>
+                            ))}
+                        </div>
+
+                        {/* Rows */}
+                        {filtered.map((subscriber, i) => (
+                            <motion.div
+                                key={subscriber.id}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: i * 0.03 }}
+                                className="grid gap-4 px-6 py-5 border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors items-center"
+                                style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 160px" }}
+                            >
+                                {/* Name */}
+                                <div>
+                                    <p className="text-sm text-white font-light">{subscriber.name}</p>
+                                    {subscriber.last_visit_at && (
+                                        <p className="text-[10px] text-white/30 mt-0.5">
+                                            Last visit {formatDistanceToNow(new Date(subscriber.last_visit_at), { addSuffix: true })}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Email */}
+                                <p className="text-xs text-white/50 font-light truncate">{subscriber.email}</p>
+
+                                {/* Phone */}
+                                <p className="text-xs text-white/40 font-light">{subscriber.phone || '—'}</p>
+
+                                {/* Visits */}
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg font-light text-white">{subscriber.visit_count}</span>
+                                </div>
+
+                                {/* Joined */}
+                                <p className="text-[10px] text-white/30">
+                                    {formatDistanceToNow(new Date(subscriber.issued_at), { addSuffix: true })}
+                                </p>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => recordVisit(subscriber)}
+                                        disabled={actionLoading === `visit-${subscriber.id}`}
+                                        title="Record visit (+1 count, updates Google Wallet)"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/50 border border-white/[0.1] hover:border-white/25 hover:text-white transition-all disabled:opacity-40"
+                                    >
+                                        <Plus size={10} />
+                                        {actionLoading === `visit-${subscriber.id}` ? '…' : 'Visit'}
+                                    </button>
+                                    <button
+                                        onClick={() => sendUpdatedPass(subscriber)}
+                                        disabled={actionLoading === `pass-${subscriber.id}`}
+                                        title="Re-send updated Apple Wallet pass via email"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/50 border border-white/[0.1] hover:border-white/25 hover:text-white transition-all disabled:opacity-40"
+                                    >
+                                        <Send size={10} />
+                                        {actionLoading === `pass-${subscriber.id}` ? '…' : 'Pass'}
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                )}
+
+                <p className="text-[10px] text-white/20 mt-4 tracking-wider">
+                    {filtered.length} of {subscribers.length} subscriber{subscribers.length !== 1 ? 's' : ''}
+                    &nbsp;·&nbsp; Visit button updates Google Wallet live on device + records to DB.
+                    Pass button re-sends updated Apple Wallet .pkpass via email.
+                </p>
+            </div>
+        </div>
+    );
+}

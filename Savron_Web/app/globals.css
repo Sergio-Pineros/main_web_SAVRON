@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 5, 5, 5;
+  --surface-rgb: 14, 14, 14;
+  --accent-green: 27, 67, 50;
+  --accent-silver: 163, 163, 163;
+}
+
+/* Silver text selection */
+::selection {
+  background: rgba(163, 163, 163, 0.2);
+  color: #fff;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Luxury Utility Classes === */
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+
+  /* Luxury processing delay - deliberate feel */
+  .luxury-transition {
+    @apply transition-all duration-700 ease-out;
+  }
+
+  /* Entry fade for all pages */
+  .entry-fade {
+    animation: fade-in 0.8s ease-out forwards;
+    opacity: 0;
+  }
+
+  .entry-fade-delay {
+    animation: fade-in 0.8s ease-out 0.3s forwards;
+    opacity: 0;
+  }
+
+  /* Form input - premium style */
+  .input-savron {
+    @apply w-full bg-transparent border border-white/10 text-white px-4 py-3.5 outline-none
+    focus:border-savron-green-light transition-all duration-500 rounded-savron text-sm
+    placeholder:text-white/20 placeholder:uppercase placeholder:tracking-widest
+    hover:border-white/20;
+    box-shadow: none;
+  }
+  .input-savron:focus {
+    box-shadow: 0 0 0 1px rgba(45, 122, 79, 0.3), 0 0 20px rgba(45, 122, 79, 0.08);
+  }
+
+  /* Card surface */
+  .card-savron {
+    @apply bg-savron-charcoal border border-white/[0.06] rounded-savron p-6;
+  }
+
+  /* Status badge base */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 text-xs uppercase tracking-widest rounded-savron font-medium;
+  }
+
+  .badge-pending {
+    @apply badge bg-yellow-900/20 text-yellow-400/80 border border-yellow-500/15;
+  }
+
+  .badge-approved {
+    @apply badge bg-savron-green/10 text-savron-green-light border border-savron-green/20;
+  }
+
+  .badge-rejected {
+    @apply badge bg-red-900/20 text-red-400/80 border border-red-500/15;
+  }
+
+  .badge-interview {
+    @apply badge bg-blue-900/20 text-blue-400/80 border border-blue-500/15;
+  }
+
+  /* Brutalist / Industrial surfaces */
+  .concrete-surface {
+    @apply bg-savron-concrete border border-white/[0.04];
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  .brutalist-border {
+    @apply border border-white/[0.06];
+  }
+
+  /* Silver divider line */
+  .divider-silver {
+    @apply h-px w-16 bg-gradient-to-r from-transparent via-savron-silver/50 to-transparent;
+  }
+
+  /* Chapter label */
+  .chapter-label {
+    @apply font-mono text-xs tracking-[0.4em] text-savron-silver/60 uppercase;
+  }
+
+  /* Silver price */
+  .price-silver {
+    @apply font-mono text-savron-silver tracking-wider;
+  }
+
+}

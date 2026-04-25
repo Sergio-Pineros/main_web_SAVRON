@@ -1,0 +1,184 @@
+import Image from 'next/image';
+import Link from 'next/link';
+import MembershipSignupForm from '@/components/home/MembershipSignupForm';
+
+const Footer = () => {
+    return (
+        <footer style={{ background: "#0d0d0b", color: "#e8e4dc", fontFamily: "var(--font-montserrat), sans-serif" }}>
+
+            {/* Top rule */}
+            <div style={{ height: 1, background: "rgba(232,228,220,0.06)" }} />
+
+            {/* Membership signup section */}
+            <div style={{
+                padding: "clamp(72px, 10vw, 120px) clamp(24px, 8vw, 120px)",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "clamp(40px, 8vw, 120px)",
+                alignItems: "start",
+                borderBottom: "1px solid rgba(232,228,220,0.05)",
+            }}
+                className="footer-signup-grid"
+            >
+                {/* Left: editorial copy */}
+                <div>
+                    <p style={{
+                        fontFamily: "var(--font-montserrat), sans-serif",
+                        fontWeight: 300, fontSize: 9,
+                        letterSpacing: "0.4em", textTransform: "uppercase",
+                        color: "rgba(232,228,220,0.25)", marginBottom: 28,
+                    }}>
+                        004 — The List
+                    </p>
+                    <h2 style={{
+                        fontFamily: "var(--font-playfair), Georgia, serif",
+                        fontWeight: 600,
+                        fontSize: "clamp(32px, 3.5vw, 52px)",
+                        lineHeight: 1.05,
+                        color: "#e8e4dc",
+                        letterSpacing: "-0.02em",
+                        marginBottom: 28,
+                    }}>
+                        Request access.
+                    </h2>
+                    <p style={{
+                        fontFamily: "var(--font-montserrat), sans-serif",
+                        fontWeight: 300, fontSize: 13,
+                        lineHeight: 1.9,
+                        color: "rgba(232,228,220,0.4)",
+                        maxWidth: 340,
+                        marginBottom: 36,
+                    }}>
+                        Leave your name and email. Your digital membership pass — Apple Wallet or Google Wallet — arrives immediately. It tracks your visits automatically.
+                    </p>
+                    {["Apple Wallet", "Google Wallet"].map((item) => (
+                        <p key={item} style={{
+                            fontFamily: "var(--font-montserrat), sans-serif",
+                            fontWeight: 300, fontSize: 10,
+                            letterSpacing: "0.18em",
+                            color: "rgba(232,228,220,0.18)",
+                            display: "flex", alignItems: "center", gap: 12,
+                            marginBottom: 10,
+                        }}>
+                            <span style={{ width: 20, height: 1, background: "rgba(232,228,220,0.12)", display: "inline-block" }} />
+                            {item}
+                        </p>
+                    ))}
+                </div>
+
+                {/* Right: form */}
+                <div style={{ paddingTop: 4 }}>
+                    <MembershipSignupForm />
+                    <p style={{
+                        fontFamily: "var(--font-montserrat), sans-serif",
+                        fontWeight: 300, fontSize: 9,
+                        letterSpacing: "0.22em", textTransform: "uppercase",
+                        color: "rgba(232,228,220,0.12)", textAlign: "center",
+                        marginTop: 24,
+                    }}>
+                        Invitation only &nbsp;·&nbsp; North Loop, Minneapolis
+                    </p>
+                </div>
+            </div>
+
+            {/* Nav + contact row */}
+            <div style={{
+                padding: "clamp(40px, 6vw, 72px) clamp(24px, 8vw, 120px)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 40,
+                borderBottom: "1px solid rgba(232,228,220,0.05)",
+                flexWrap: "wrap",
+            }}>
+                {/* Brand */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 240 }}>
+                    <div style={{ position: "relative", width: 108, height: 26 }}>
+                        <Image src="/logo.png" alt="SAVRON" fill style={{ objectFit: "contain", objectPosition: "left", opacity: 0.7 }} />
+                    </div>
+                    <p style={{ fontSize: 12, fontWeight: 300, lineHeight: 1.8, color: "rgba(232,228,220,0.32)" }}>
+                        A luxury barbershop in Minneapolis. Traditional craftsmanship, modern aesthetic.
+                    </p>
+                </div>
+
+                {/* Links */}
+                <div style={{ display: "flex", gap: 64 }}>
+                    <div>
+                        <p style={{ fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(232,228,220,0.25)", marginBottom: 20 }}>
+                            Explore
+                        </p>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                            {[
+                                { href: "#about", label: "About" },
+                                { href: "#services", label: "Services" },
+                                { href: "/booking", label: "Book Now" },
+                                { href: "/portal", label: "Join the Team" },
+                            ].map(({ href, label }) => (
+                                <li key={href}>
+                                    <Link href={href} style={{
+                                        fontSize: 12, fontWeight: 300,
+                                        letterSpacing: "0.08em",
+                                        color: "rgba(232,228,220,0.38)",
+                                        textDecoration: "none",
+                                        transition: "color 0.3s",
+                                    }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e4dc")}
+                                        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(232,228,220,0.38)")}
+                                    >
+                                        {label}
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div>
+                        <p style={{ fontSize: 9, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(232,228,220,0.25)", marginBottom: 20 }}>
+                            Contact
+                        </p>
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                            <li style={{ fontSize: 12, fontWeight: 300, color: "rgba(232,228,220,0.38)" }}>Minneapolis, MN</li>
+                            <li>
+                                <a href="mailto:info@savronmn.com" style={{
+                                    fontSize: 12, fontWeight: 300,
+                                    color: "rgba(232,228,220,0.38)", textDecoration: "none",
+                                    transition: "color 0.3s",
+                                }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = "#e8e4dc")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(232,228,220,0.38)")}
+                                >
+                                    info@savronmn.com
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            {/* Copyright */}
+            <div style={{
+                padding: "20px clamp(24px, 8vw, 120px)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+            }}>
+                <p style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(232,228,220,0.14)" }}>
+                    © {new Date().getFullYear()} SAVRON. All rights reserved.
+                </p>
+                <p style={{ fontSize: 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(232,228,220,0.14)" }}>
+                    savronmn.com
+                </p>
+            </div>
+
+            <style>{`
+                @media (max-width: 768px) {
+                    .footer-signup-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+            `}</style>
+        </footer>
+    );
+};
+
+export default Footer;
