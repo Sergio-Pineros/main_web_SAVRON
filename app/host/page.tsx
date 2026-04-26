@@ -8,7 +8,7 @@ import {
     startOfWeek, endOfWeek, eachDayOfInterval,
     startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, RefreshCw, Wifi, X, UserCheck, UserX, RotateCcw, Phone, Scissors, Menu, LayoutDashboard, Users, CreditCard, Mail, MonitorPlay } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Wifi, X, UserCheck, UserX, RotateCcw, Phone, Scissors, Menu, LayoutDashboard, Users, CreditCard, Mail, MonitorPlay, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -65,7 +65,7 @@ export default function HostDashboard() {
             .select('*')
             .gte('date', rangeStart)
             .lte('date', rangeEnd)
-            .in('status', ['confirmed', 'completed', 'no_show'])
+            .in('status', ['confirmed', 'completed', 'no_show', 'cancelled'])
             .order('time');
         setBookings(data ?? []);
     }, [rangeStart, rangeEnd]);
@@ -146,9 +146,13 @@ export default function HostDashboard() {
         return bookings.filter(b => b.date === d);
     };
 
-    const svcColor = (s: string) => SERVICE_COLORS[s] ?? 'bg-white/10 border-white/20 text-white/70';
+    const svcColor = (s: string, cancelled = false) =>
+        cancelled ? 'bg-white/5 border-white/10 text-white/25 line-through' : (SERVICE_COLORS[s] ?? 'bg-white/10 border-white/20 text-white/70');
     const statusDot = (s: Booking['status']) =>
-        s === 'confirmed' ? 'bg-savron-green' : s === 'completed' ? 'bg-blue-400' : s === 'no_show' ? 'bg-red-400' : 'bg-savron-silver';
+        s === 'confirmed' ? 'bg-savron-green' :
+        s === 'completed' ? 'bg-blue-400' :
+        s === 'no_show'   ? 'bg-red-400' :
+        s === 'cancelled' ? 'bg-white/20' : 'bg-savron-silver';
 
     const confirmed = bookings.filter(b => b.status === 'confirmed').length;
     const completed = bookings.filter(b => b.status === 'completed').length;
@@ -173,7 +177,7 @@ export default function HostDashboard() {
             className={cn(
                 "rounded-savron border cursor-pointer transition-opacity hover:opacity-80 mb-1",
                 compact ? "p-1.5 text-[10px] space-y-0.5" : "p-2.5 text-xs space-y-1",
-                svcColor(b.service)
+                svcColor(b.service, b.status === 'cancelled')
             )}
         >
             <div className="flex items-center justify-between gap-1">
@@ -404,7 +408,7 @@ export default function HostDashboard() {
                                                 {dayBookings.slice(0, MAX).map(b => (
                                                     <div key={b.id}
                                                         onClick={e => { e.stopPropagation(); setActiveBooking(b); }}
-                                                        className={cn("px-1.5 py-0.5 rounded text-[9px] truncate border leading-tight cursor-pointer hover:opacity-80 transition-opacity", svcColor(b.service))}>
+                                                        className={cn("px-1.5 py-0.5 rounded text-[9px] truncate border leading-tight cursor-pointer hover:opacity-80 transition-opacity", svcColor(b.service, b.status === 'cancelled'))}>
                                                         {b.time?.replace(':00 ', '').replace(' ', '').toLowerCase()} · {b.client_name ?? 'Walk-in'}
                                                     </div>
                                                 ))}
@@ -442,7 +446,8 @@ export default function HostDashboard() {
                             {/* Status bar */}
                             <div className={cn("h-1 w-full",
                                 activeBooking.status === 'confirmed' ? "bg-savron-green" :
-                                activeBooking.status === 'completed' ? "bg-blue-400" : "bg-red-400"
+                                activeBooking.status === 'completed' ? "bg-blue-400" :
+                                activeBooking.status === 'cancelled' ? "bg-white/20" : "bg-red-400"
                             )} />
 
                             {/* Header */}
@@ -450,7 +455,8 @@ export default function HostDashboard() {
                                 <div>
                                     <p className="text-[10px] uppercase tracking-[0.3em] text-savron-silver/50 mb-1">
                                         {activeBooking.status === 'confirmed' ? 'Appointment' :
-                                         activeBooking.status === 'completed' ? 'Checked In' : 'No Show'}
+                                         activeBooking.status === 'completed' ? 'Checked In' :
+                                         activeBooking.status === 'cancelled' ? 'Cancelled' : 'No Show'}
                                     </p>
                                     <h2 className="text-white font-heading text-xl uppercase tracking-wider leading-tight">
                                         {activeBooking.client_name ?? 'Walk-in'}
@@ -501,22 +507,31 @@ export default function HostDashboard() {
                                 {/* Action buttons */}
                                 <div className="pt-2 space-y-2">
                                     {activeBooking.status === 'confirmed' && (
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    onClick={() => updateStatus(activeBooking, 'completed')}
+                                                    disabled={updating}
+                                                    className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-savron-green text-black rounded-savron hover:bg-opacity-90 transition-all disabled:opacity-50"
+                                                >
+                                                    {updating ? <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <><UserCheck className="w-4 h-4" /> Check In</>}
+                                                </button>
+                                                <button
+                                                    onClick={() => updateStatus(activeBooking, 'no_show')}
+                                                    disabled={updating}
+                                                    className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-red-500/15 text-red-400 border border-red-500/25 rounded-savron hover:bg-red-500/25 transition-all disabled:opacity-50"
+                                                >
+                                                    {updating ? <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" /> : <><UserX className="w-4 h-4" /> No Show</>}
+                                                </button>
+                                            </div>
                                             <button
-                                                onClick={() => updateStatus(activeBooking, 'completed')}
+                                                onClick={() => updateStatus(activeBooking, 'cancelled')}
                                                 disabled={updating}
-                                                className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-savron-green text-black rounded-savron hover:bg-opacity-90 transition-all disabled:opacity-50"
+                                                className="w-full flex items-center justify-center gap-2 py-2.5 text-[11px] uppercase tracking-widest font-medium bg-white/5 text-white/40 border border-white/10 rounded-savron hover:bg-white/10 hover:text-white/70 transition-all disabled:opacity-50"
                                             >
-                                                {updating ? <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <><UserCheck className="w-4 h-4" /> Check In</>}
+                                                {updating ? <div className="w-4 h-4 border-2 border-white/20 border-t-white/50 rounded-full animate-spin" /> : <><Ban className="w-4 h-4" /> Cancel Appointment</>}
                                             </button>
-                                            <button
-                                                onClick={() => updateStatus(activeBooking, 'no_show')}
-                                                disabled={updating}
-                                                className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-red-500/15 text-red-400 border border-red-500/25 rounded-savron hover:bg-red-500/25 transition-all disabled:opacity-50"
-                                            >
-                                                {updating ? <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" /> : <><UserX className="w-4 h-4" /> No Show</>}
-                                            </button>
-                                        </div>
+                                        </>
                                     )}
 
                                     {activeBooking.status === 'completed' && (
@@ -545,6 +560,21 @@ export default function HostDashboard() {
                                                 className="w-full flex items-center justify-center gap-2 py-2 text-[10px] uppercase tracking-widest text-savron-silver/60 hover:text-white transition-colors disabled:opacity-50"
                                             >
                                                 <RotateCcw className="w-3 h-3" /> Undo
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {activeBooking.status === 'cancelled' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest text-white/30 bg-white/5 border border-white/10 rounded-savron">
+                                                <Ban className="w-4 h-4" /> Cancelled
+                                            </div>
+                                            <button
+                                                onClick={() => updateStatus(activeBooking, 'confirmed')}
+                                                disabled={updating}
+                                                className="w-full flex items-center justify-center gap-2 py-2 text-[10px] uppercase tracking-widest text-savron-silver/60 hover:text-white transition-colors disabled:opacity-50"
+                                            >
+                                                <RotateCcw className="w-3 h-3" /> Restore
                                             </button>
                                         </div>
                                     )}
