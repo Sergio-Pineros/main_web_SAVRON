@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     format, addDays, subDays, isToday, isSameMonth,
     startOfWeek, endOfWeek, eachDayOfInterval,
     startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, RefreshCw, Wifi } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Wifi, X, UserCheck, UserX, RotateCcw, Phone, Scissors } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import type { Barber, Booking } from '@/lib/types';
@@ -24,6 +24,10 @@ export default function HostDashboard() {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
     const [realtimeConnected, setRealtimeConnected] = useState(false);
+
+    // Appointment detail modal
+    const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
+    const [updating, setUpdating] = useState(false);
 
     const [rangeStart, rangeEnd] = useMemo(() => {
         if (view === 'day') {
@@ -73,6 +77,15 @@ export default function HostDashboard() {
         return () => { supabase.removeChannel(channel); };
     }, [rangeStart, rangeEnd, fetchBookings]);
 
+    // Update a booking's status — optimistic local update + DB write
+    const updateStatus = async (booking: Booking, status: Booking['status']) => {
+        setUpdating(true);
+        await supabase.from('bookings').update({ status }).eq('id', booking.id);
+        setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status } : b));
+        setActiveBooking(prev => prev?.id === booking.id ? { ...prev, status } : prev);
+        setUpdating(false);
+    };
+
     // Navigation
     const prev = () => {
         if (view === 'day')   setSelectedDate(d => subDays(d, 1));
@@ -85,7 +98,7 @@ export default function HostDashboard() {
         if (view === 'month') setSelectedDate(d => addMonths(d, 1));
     };
 
-    // Header label
+    // Header labels
     const headingLabel = (() => {
         if (view === 'day')   return isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE');
         if (view === 'week') {
@@ -108,38 +121,57 @@ export default function HostDashboard() {
         return `${bookings.length} booking${bookings.length !== 1 ? 's' : ''}`;
     })();
 
-    // Helpers
+    // Data helpers
     const bookingsForBarberTime = (barberId: string, time: string) =>
         bookings.filter(b => b.barber_id === barberId && b.time === time);
-
     const bookingsForDayTime = (day: Date, time: string) => {
         const d = format(day, 'yyyy-MM-dd');
         return bookings.filter(b => b.date === d && b.time === time);
     };
-
     const bookingsForDay = (day: Date) => {
         const d = format(day, 'yyyy-MM-dd');
         return bookings.filter(b => b.date === d);
     };
 
     const svcColor = (s: string) => SERVICE_COLORS[s] ?? 'bg-white/10 border-white/20 text-white/70';
-
     const statusDot = (s: Booking['status']) =>
         s === 'confirmed' ? 'bg-savron-green' : s === 'completed' ? 'bg-blue-400' : s === 'no_show' ? 'bg-red-400' : 'bg-savron-silver';
 
-    const confirmed  = bookings.filter(b => b.status === 'confirmed').length;
-    const completed  = bookings.filter(b => b.status === 'completed').length;
-    const noShow     = bookings.filter(b => b.status === 'no_show').length;
+    const confirmed = bookings.filter(b => b.status === 'confirmed').length;
+    const completed = bookings.filter(b => b.status === 'completed').length;
+    const noShow    = bookings.filter(b => b.status === 'no_show').length;
 
     const weekDays = eachDayOfInterval({
         start: startOfWeek(selectedDate, { weekStartsOn: 1 }),
         end:   endOfWeek(selectedDate,   { weekStartsOn: 1 }),
     });
-
     const calDays = eachDayOfInterval({
         start: startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }),
         end:   endOfWeek(endOfMonth(selectedDate),     { weekStartsOn: 1 }),
     });
+
+    // Reusable pill — used in all three views
+    const Pill = ({ b, compact = false }: { b: Booking; compact?: boolean }) => (
+        <motion.div
+            key={b.id}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={e => { e.stopPropagation(); setActiveBooking(b); }}
+            className={cn(
+                "rounded-savron border cursor-pointer transition-opacity hover:opacity-80 mb-1",
+                compact ? "p-1.5 text-[10px] space-y-0.5" : "p-2.5 text-xs space-y-1",
+                svcColor(b.service)
+            )}
+        >
+            <div className="flex items-center justify-between gap-1">
+                <span className="font-medium truncate">{b.client_name ?? 'Walk-in'}</span>
+                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusDot(b.status))} />
+            </div>
+            <p className="opacity-70 truncate">{compact ? (b.barber_name ?? b.service) : b.service}</p>
+            {!compact && b.duration    && <p className="opacity-50 text-[10px]">{b.duration}</p>}
+            {!compact && b.client_phone && <p className="opacity-50 text-[10px] font-mono">{b.client_phone}</p>}
+        </motion.div>
+    );
 
     return (
         <div className="min-h-screen bg-savron-black flex flex-col">
@@ -147,7 +179,6 @@ export default function HostDashboard() {
             {/* ── Header ── */}
             <header className="bg-savron-grey border-b border-white/5 px-6 py-4 flex items-center justify-between shrink-0 gap-4 flex-wrap">
 
-                {/* Left: title + live + view switcher */}
                 <div className="flex items-center gap-4">
                     <h1 className="font-heading text-xl uppercase tracking-widest text-white">Host View</h1>
                     <div className="flex items-center gap-1.5">
@@ -156,65 +187,38 @@ export default function HostDashboard() {
                             {realtimeConnected ? "Live" : "Connecting…"}
                         </span>
                     </div>
-
-                    {/* View toggle */}
                     <div className="flex border border-white/10 rounded-savron overflow-hidden">
                         {(['day', 'week', 'month'] as CalView[]).map(v => (
-                            <button
-                                key={v}
-                                onClick={() => setView(v)}
-                                className={cn(
-                                    "px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all",
-                                    view === v
-                                        ? "bg-savron-green/15 text-savron-green"
-                                        : "text-savron-silver hover:text-white hover:bg-white/5"
-                                )}
-                            >
+                            <button key={v} onClick={() => setView(v)}
+                                className={cn("px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all",
+                                    view === v ? "bg-savron-green/15 text-savron-green" : "text-savron-silver hover:text-white hover:bg-white/5"
+                                )}>
                                 {v}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* Centre: date nav */}
                 <div className="flex items-center gap-3">
-                    <button onClick={prev} className="p-2 text-savron-silver hover:text-white transition-colors">
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
+                    <button onClick={prev} className="p-2 text-savron-silver hover:text-white transition-colors"><ChevronLeft className="w-4 h-4" /></button>
                     <div className="text-center min-w-[160px]">
                         <p className="text-white font-heading uppercase tracking-widest text-sm">{headingLabel}</p>
                         <p className="text-savron-silver text-xs uppercase tracking-widest">{subLabel}</p>
                     </div>
-                    <button onClick={next} className="p-2 text-savron-silver hover:text-white transition-colors">
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <button onClick={next} className="p-2 text-savron-silver hover:text-white transition-colors"><ChevronRight className="w-4 h-4" /></button>
                     {!isToday(selectedDate) && (
-                        <button
-                            onClick={() => setSelectedDate(new Date())}
-                            className="text-xs uppercase tracking-widest text-savron-green hover:text-white transition-colors px-3 py-1 border border-savron-green/30 rounded-savron"
-                        >
+                        <button onClick={() => setSelectedDate(new Date())}
+                            className="text-xs uppercase tracking-widest text-savron-green hover:text-white transition-colors px-3 py-1 border border-savron-green/30 rounded-savron">
                             Today
                         </button>
                     )}
                 </div>
 
-                {/* Right: stats */}
                 <div className="flex items-center gap-6">
-                    <div className="text-center">
-                        <p className="text-white font-mono text-lg">{confirmed}</p>
-                        <p className="text-savron-silver text-[10px] uppercase tracking-widest">Confirmed</p>
-                    </div>
-                    <div className="text-center">
-                        <p className="text-blue-400 font-mono text-lg">{completed}</p>
-                        <p className="text-savron-silver text-[10px] uppercase tracking-widest">Done</p>
-                    </div>
-                    <div className="text-center">
-                        <p className="text-red-400 font-mono text-lg">{noShow}</p>
-                        <p className="text-savron-silver text-[10px] uppercase tracking-widest">No-show</p>
-                    </div>
-                    <button onClick={fetchBookings} className="p-2 text-savron-silver hover:text-white transition-colors">
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
+                    <div className="text-center"><p className="text-white font-mono text-lg">{confirmed}</p><p className="text-savron-silver text-[10px] uppercase tracking-widest">Confirmed</p></div>
+                    <div className="text-center"><p className="text-blue-400 font-mono text-lg">{completed}</p><p className="text-savron-silver text-[10px] uppercase tracking-widest">Done</p></div>
+                    <div className="text-center"><p className="text-red-400 font-mono text-lg">{noShow}</p><p className="text-savron-silver text-[10px] uppercase tracking-widest">No-show</p></div>
+                    <button onClick={fetchBookings} className="p-2 text-savron-silver hover:text-white transition-colors"><RefreshCw className="w-4 h-4" /></button>
                 </div>
             </header>
 
@@ -230,7 +234,6 @@ export default function HostDashboard() {
                     {view === 'day' && (
                         <div className="flex-1 overflow-auto">
                             <div className="min-w-max">
-                                {/* Barber column headers */}
                                 <div className="flex border-b border-white/5 bg-savron-grey sticky top-0 z-10">
                                     <div className="w-24 shrink-0 p-4 border-r border-white/5">
                                         <span className="text-[10px] uppercase tracking-widest text-savron-silver/40">Time</span>
@@ -253,30 +256,15 @@ export default function HostDashboard() {
                                         <div className="w-24 shrink-0 p-4 border-r border-white/5 flex items-start">
                                             <span className="text-savron-silver/50 text-xs font-mono">{time}</span>
                                         </div>
-                                        {barbers.map(barber => {
-                                            const cells = bookingsForBarberTime(barber.id, time);
-                                            return (
-                                                <div key={barber.id} className="w-52 shrink-0 p-2 border-r border-white/5 min-h-[80px]">
-                                                    {cells.map(b => (
-                                                        <motion.div key={b.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-                                                            className={cn("p-2.5 rounded-savron border text-xs space-y-1 mb-1", svcColor(b.service))}>
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="font-medium truncate">{b.client_name ?? 'Walk-in'}</span>
-                                                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusDot(b.status))} />
-                                                            </div>
-                                                            <p className="opacity-70 truncate">{b.service}</p>
-                                                            {b.duration && <p className="opacity-50 text-[10px]">{b.duration}</p>}
-                                                            {b.client_phone && <p className="opacity-50 text-[10px] font-mono">{b.client_phone}</p>}
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
+                                        {barbers.map(barber => (
+                                            <div key={barber.id} className="w-52 shrink-0 p-2 border-r border-white/5 min-h-[80px]">
+                                                {bookingsForBarberTime(barber.id, time).map(b => <Pill key={b.id} b={b} />)}
+                                            </div>
+                                        ))}
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Legend */}
                             <div className="sticky bottom-0 bg-savron-black border-t border-white/5 px-6 py-3 flex items-center gap-6 flex-wrap">
                                 <span className="text-[10px] uppercase tracking-widest text-savron-silver/40">Legend:</span>
                                 {Object.entries(SERVICE_COLORS).map(([name, cls]) => (
@@ -300,7 +288,6 @@ export default function HostDashboard() {
                     {view === 'week' && (
                         <div className="flex-1 overflow-auto">
                             <div className="min-w-max">
-                                {/* Day column headers */}
                                 <div className="flex border-b border-white/5 bg-savron-grey sticky top-0 z-10">
                                     <div className="w-24 shrink-0 p-4 border-r border-white/5">
                                         <span className="text-[10px] uppercase tracking-widest text-savron-silver/40">Time</span>
@@ -308,23 +295,12 @@ export default function HostDashboard() {
                                     {weekDays.map(day => {
                                         const count = bookingsForDay(day).length;
                                         return (
-                                            <div
-                                                key={day.toISOString()}
+                                            <div key={day.toISOString()}
                                                 onClick={() => { setSelectedDate(day); setView('day'); }}
-                                                className={cn(
-                                                    "w-44 shrink-0 p-3 border-r border-white/5 text-center cursor-pointer hover:bg-white/5 transition-colors",
-                                                    isToday(day) && "bg-savron-green/5"
-                                                )}
-                                            >
-                                                <p className={cn("text-xs font-heading uppercase tracking-widest", isToday(day) ? "text-savron-green" : "text-white")}>
-                                                    {format(day, 'EEE')}
-                                                </p>
-                                                <p className={cn("text-lg font-mono", isToday(day) ? "text-savron-green" : "text-savron-silver/70")}>
-                                                    {format(day, 'd')}
-                                                </p>
-                                                {count > 0 && (
-                                                    <span className="text-[9px] text-savron-silver/40 uppercase tracking-widest">{count} appt{count !== 1 ? 's' : ''}</span>
-                                                )}
+                                                className={cn("w-44 shrink-0 p-3 border-r border-white/5 text-center cursor-pointer hover:bg-white/5 transition-colors", isToday(day) && "bg-savron-green/5")}>
+                                                <p className={cn("text-xs font-heading uppercase tracking-widest", isToday(day) ? "text-savron-green" : "text-white")}>{format(day, 'EEE')}</p>
+                                                <p className={cn("text-lg font-mono", isToday(day) ? "text-savron-green" : "text-savron-silver/70")}>{format(day, 'd')}</p>
+                                                {count > 0 && <span className="text-[9px] text-savron-silver/40 uppercase tracking-widest">{count} appt{count !== 1 ? 's' : ''}</span>}
                                             </div>
                                         );
                                     })}
@@ -335,29 +311,12 @@ export default function HostDashboard() {
                                         <div className="w-24 shrink-0 p-4 border-r border-white/5 flex items-start">
                                             <span className="text-savron-silver/50 text-xs font-mono">{time}</span>
                                         </div>
-                                        {weekDays.map(day => {
-                                            const cells = bookingsForDayTime(day, time);
-                                            return (
-                                                <div
-                                                    key={day.toISOString()}
-                                                    className={cn(
-                                                        "w-44 shrink-0 p-1.5 border-r border-white/5 min-h-[72px]",
-                                                        isToday(day) && "bg-savron-green/[0.03]"
-                                                    )}
-                                                >
-                                                    {cells.map(b => (
-                                                        <motion.div key={b.id} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-                                                            className={cn("p-1.5 rounded-savron border text-[10px] mb-1 space-y-0.5", svcColor(b.service))}>
-                                                            <div className="flex items-center justify-between gap-1">
-                                                                <span className="font-medium truncate">{b.client_name ?? 'Walk-in'}</span>
-                                                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusDot(b.status))} />
-                                                            </div>
-                                                            <p className="opacity-60 truncate">{b.barber_name ?? b.service}</p>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })}
+                                        {weekDays.map(day => (
+                                            <div key={day.toISOString()}
+                                                className={cn("w-44 shrink-0 p-1.5 border-r border-white/5 min-h-[72px]", isToday(day) && "bg-savron-green/[0.03]")}>
+                                                {bookingsForDayTime(day, time).map(b => <Pill key={b.id} b={b} compact />)}
+                                            </div>
+                                        ))}
                                     </div>
                                 ))}
                             </div>
@@ -369,14 +328,11 @@ export default function HostDashboard() {
                     ══════════════════════════════════════ */}
                     {view === 'month' && (
                         <div className="flex-1 overflow-auto p-6">
-                            {/* Day-of-week headers */}
                             <div className="grid grid-cols-7 mb-1">
                                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
                                     <div key={d} className="text-center py-2 text-[10px] uppercase tracking-widest text-savron-silver/40">{d}</div>
                                 ))}
                             </div>
-
-                            {/* Day cells */}
                             <div className="grid grid-cols-7 gap-px bg-white/5 border border-white/5 rounded-savron overflow-hidden">
                                 {calDays.map(day => {
                                     const dayBookings = bookingsForDay(day);
@@ -384,38 +340,23 @@ export default function HostDashboard() {
                                     const today = isToday(day);
                                     const MAX = 3;
                                     return (
-                                        <div
-                                            key={day.toISOString()}
+                                        <div key={day.toISOString()}
                                             onClick={() => { setSelectedDate(day); setView('day'); }}
-                                            className={cn(
-                                                "min-h-[120px] p-2 bg-savron-black cursor-pointer transition-colors hover:bg-savron-grey/80",
-                                                !inMonth && "opacity-25"
-                                            )}
-                                        >
-                                            {/* Date number */}
-                                            <div className={cn(
-                                                "w-7 h-7 flex items-center justify-center rounded-full text-xs font-mono mb-1.5 transition-colors",
-                                                today
-                                                    ? "bg-savron-green text-black font-semibold"
-                                                    : "text-savron-silver hover:text-white"
-                                            )}>
+                                            className={cn("min-h-[120px] p-2 bg-savron-black cursor-pointer transition-colors hover:bg-savron-grey/80", !inMonth && "opacity-25")}>
+                                            <div className={cn("w-7 h-7 flex items-center justify-center rounded-full text-xs font-mono mb-1.5",
+                                                today ? "bg-savron-green text-black font-semibold" : "text-savron-silver")}>
                                                 {format(day, 'd')}
                                             </div>
-
-                                            {/* Booking pills */}
                                             <div className="space-y-0.5">
                                                 {dayBookings.slice(0, MAX).map(b => (
-                                                    <div
-                                                        key={b.id}
-                                                        className={cn("px-1.5 py-0.5 rounded text-[9px] truncate border leading-tight", svcColor(b.service))}
-                                                    >
+                                                    <div key={b.id}
+                                                        onClick={e => { e.stopPropagation(); setActiveBooking(b); }}
+                                                        className={cn("px-1.5 py-0.5 rounded text-[9px] truncate border leading-tight cursor-pointer hover:opacity-80 transition-opacity", svcColor(b.service))}>
                                                         {b.time?.replace(':00 ', '').replace(' ', '').toLowerCase()} · {b.client_name ?? 'Walk-in'}
                                                     </div>
                                                 ))}
                                                 {dayBookings.length > MAX && (
-                                                    <p className="text-[9px] text-savron-silver/40 pl-1">
-                                                        +{dayBookings.length - MAX} more
-                                                    </p>
+                                                    <p className="text-[9px] text-savron-silver/40 pl-1">+{dayBookings.length - MAX} more</p>
                                                 )}
                                             </div>
                                         </div>
@@ -426,6 +367,140 @@ export default function HostDashboard() {
                     )}
                 </>
             )}
+
+            {/* ══════════════════════════════════════
+                APPOINTMENT DETAIL MODAL
+            ══════════════════════════════════════ */}
+            <AnimatePresence>
+                {activeBooking && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+                        onClick={() => setActiveBooking(null)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                            transition={{ duration: 0.15 }}
+                            className="bg-savron-grey border border-white/10 rounded-savron w-full max-w-sm shadow-2xl overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Status bar */}
+                            <div className={cn("h-1 w-full",
+                                activeBooking.status === 'confirmed' ? "bg-savron-green" :
+                                activeBooking.status === 'completed' ? "bg-blue-400" : "bg-red-400"
+                            )} />
+
+                            {/* Header */}
+                            <div className="flex items-start justify-between p-5 pb-4">
+                                <div>
+                                    <p className="text-[10px] uppercase tracking-[0.3em] text-savron-silver/50 mb-1">
+                                        {activeBooking.status === 'confirmed' ? 'Appointment' :
+                                         activeBooking.status === 'completed' ? 'Checked In' : 'No Show'}
+                                    </p>
+                                    <h2 className="text-white font-heading text-xl uppercase tracking-wider leading-tight">
+                                        {activeBooking.client_name ?? 'Walk-in'}
+                                    </h2>
+                                </div>
+                                <button onClick={() => setActiveBooking(null)}
+                                    className="text-savron-silver hover:text-white transition-colors p-1 -mr-1 -mt-1">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            {/* Details */}
+                            <div className="px-5 pb-5 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-savron-charcoal rounded-savron p-3">
+                                        <p className="text-[9px] uppercase tracking-widest text-savron-silver/40 mb-1">Service</p>
+                                        <div className={cn("inline-flex px-2 py-0.5 rounded text-[10px] border", svcColor(activeBooking.service))}>
+                                            {activeBooking.service}
+                                        </div>
+                                    </div>
+                                    <div className="bg-savron-charcoal rounded-savron p-3">
+                                        <p className="text-[9px] uppercase tracking-widest text-savron-silver/40 mb-1">Time</p>
+                                        <p className="text-white text-sm font-mono">{activeBooking.time}</p>
+                                        {activeBooking.duration && (
+                                            <p className="text-savron-silver/50 text-[10px] mt-0.5">{activeBooking.duration}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {activeBooking.barber_name && (
+                                    <div className="flex items-center gap-2 text-sm text-savron-silver">
+                                        <Scissors className="w-3.5 h-3.5 shrink-0 text-savron-silver/40" />
+                                        {activeBooking.barber_name}
+                                    </div>
+                                )}
+                                {activeBooking.client_phone && (
+                                    <div className="flex items-center gap-2 text-sm text-savron-silver font-mono">
+                                        <Phone className="w-3.5 h-3.5 shrink-0 text-savron-silver/40" />
+                                        {activeBooking.client_phone}
+                                    </div>
+                                )}
+                                {activeBooking.notes && (
+                                    <p className="text-savron-silver/50 text-xs leading-relaxed border-t border-white/5 pt-3">
+                                        {activeBooking.notes}
+                                    </p>
+                                )}
+
+                                {/* Action buttons */}
+                                <div className="pt-2 space-y-2">
+                                    {activeBooking.status === 'confirmed' && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => updateStatus(activeBooking, 'completed')}
+                                                disabled={updating}
+                                                className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-savron-green text-black rounded-savron hover:bg-opacity-90 transition-all disabled:opacity-50"
+                                            >
+                                                {updating ? <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <><UserCheck className="w-4 h-4" /> Check In</>}
+                                            </button>
+                                            <button
+                                                onClick={() => updateStatus(activeBooking, 'no_show')}
+                                                disabled={updating}
+                                                className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest font-medium bg-red-500/15 text-red-400 border border-red-500/25 rounded-savron hover:bg-red-500/25 transition-all disabled:opacity-50"
+                                            >
+                                                {updating ? <div className="w-4 h-4 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" /> : <><UserX className="w-4 h-4" /> No Show</>}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {activeBooking.status === 'completed' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-savron">
+                                                <UserCheck className="w-4 h-4" /> Checked In
+                                            </div>
+                                            <button
+                                                onClick={() => updateStatus(activeBooking, 'confirmed')}
+                                                disabled={updating}
+                                                className="w-full flex items-center justify-center gap-2 py-2 text-[10px] uppercase tracking-widest text-savron-silver/60 hover:text-white transition-colors disabled:opacity-50"
+                                            >
+                                                <RotateCcw className="w-3 h-3" /> Undo
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {activeBooking.status === 'no_show' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-center gap-2 py-3 text-[11px] uppercase tracking-widest text-red-400 bg-red-500/10 border border-red-500/20 rounded-savron">
+                                                <UserX className="w-4 h-4" /> No Show
+                                            </div>
+                                            <button
+                                                onClick={() => updateStatus(activeBooking, 'confirmed')}
+                                                disabled={updating}
+                                                className="w-full flex items-center justify-center gap-2 py-2 text-[10px] uppercase tracking-widest text-savron-silver/60 hover:text-white transition-colors disabled:opacity-50"
+                                            >
+                                                <RotateCcw className="w-3 h-3" /> Undo
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
