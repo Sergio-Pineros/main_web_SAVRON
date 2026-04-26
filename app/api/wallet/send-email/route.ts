@@ -28,8 +28,9 @@ function getSupabaseAdmin() {
 
 // Ensure the GenericClass exists in Google Wallet (required before creating objects)
 let classEnsured = false;
-async function ensureGooglePassClass(): Promise<void> {
-    if (classEnsured || !ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return;
+async function ensureGooglePassClass(): Promise<boolean> {
+    if (classEnsured) return true;
+    if (!ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return false;
 
     const auth = new GoogleAuth({
         credentials: { client_email: SERVICE_ACCOUNT_EMAIL, private_key: GOOGLE_PRIVATE_KEY },
@@ -40,20 +41,21 @@ async function ensureGooglePassClass(): Promise<void> {
     // Check if class already exists
     try {
         await client.request({
-            url: `https://walletobjects.googleapis.com/walletobjects/v1/genericClass/${CLASS_ID}`,
+            url: `https://walletobjects.googleapis.com/walletobjects/v1/genericClass/${encodeURIComponent(CLASS_ID)}`,
             method: 'GET',
         });
+        console.log('[GWallet] Class confirmed:', CLASS_ID);
         classEnsured = true;
-        return;
+        return true;
     } catch (err: any) {
         if (err?.response?.status !== 404) {
-            console.error('Error checking Google Wallet class:', err?.response?.data || err);
-            classEnsured = true; // Don't retry on non-404 errors
-            return;
+            console.error('[GWallet] Class GET failed (status', err?.response?.status, '):', JSON.stringify(err?.response?.data || err));
+            // Auth error or unexpected failure — do NOT mark as ensured; log and abort
+            return false;
         }
     }
 
-    // Class doesn't exist — create it
+    // Class doesn't exist (404) — create it
     try {
         await client.request({
             url: `https://walletobjects.googleapis.com/walletobjects/v1/genericClass`,
@@ -61,13 +63,15 @@ async function ensureGooglePassClass(): Promise<void> {
             data: {
                 id: CLASS_ID,
                 issuerName: 'SAVRON Barbershop & Lounge',
-                reviewStatus: 'UNDER_REVIEW',
+                reviewStatus: 'DRAFT',
             },
         });
-        console.log('Google Wallet class created:', CLASS_ID);
+        console.log('[GWallet] Class created:', CLASS_ID);
         classEnsured = true;
+        return true;
     } catch (err: any) {
-        console.error('Failed to create Google Wallet class:', err?.response?.data || err);
+        console.error('[GWallet] Class POST failed (status', err?.response?.status, '):', JSON.stringify(err?.response?.data || err));
+        return false;
     }
 }
 
@@ -76,11 +80,14 @@ async function createGooglePassObject(
     name: string,
     email: string,
     visitCount: number
-): Promise<void> {
-    if (!ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return;
+): Promise<boolean> {
+    if (!ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return false;
 
-    // Ensure the class exists first
-    await ensureGooglePassClass();
+    const classOk = await ensureGooglePassClass();
+    if (!classOk) {
+        console.error('[GWallet] Skipping object creation — class not available');
+        return false;
+    }
 
     const auth = new GoogleAuth({
         credentials: {
@@ -93,24 +100,26 @@ async function createGooglePassObject(
     const client = await auth.getClient();
     const passObject = buildGooglePassObject(objectId, name, email, visitCount);
 
-    // Try to create; if it already exists (409), patch it instead
     try {
         await client.request({
             url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject`,
             method: 'POST',
             data: passObject,
         });
+        console.log('[GWallet] Object created:', objectId);
+        return true;
     } catch (err: any) {
         if (err?.response?.status === 409) {
-            // Object already exists — update it
             await client.request({
-                url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`,
+                url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${encodeURIComponent(objectId)}`,
                 method: 'PATCH',
                 data: passObject,
             });
-        } else {
-            throw err;
+            console.log('[GWallet] Object patched (409→patch):', objectId);
+            return true;
         }
+        console.error('[GWallet] Object POST failed (status', err?.response?.status, '):', JSON.stringify(err?.response?.data || err));
+        return false;
     }
 }
 
@@ -201,7 +210,7 @@ async function generateApplePass(
             { key: 'email', label: 'EMAIL', value: email, textAlignment: 'PKTextAlignmentRight' }
         );
 
-        return await pass.getAsBuffer() as unknown as Buffer;
+        return pass.getAsBuffer() as unknown as Buffer;
     } catch (err) {
         console.error('Apple pass generation failed:', err);
         return null;
@@ -264,22 +273,21 @@ export async function POST(req: NextRequest) {
         // Create Google Wallet pass object + generate Apple pass IN PARALLEL for speed
         let googleSaveUrl: string | null = null;
         const canGoogle = !!(ISSUER_ID && SERVICE_ACCOUNT_EMAIL && GOOGLE_PRIVATE_KEY && CLASS_ID);
-        
-        const [applePassBuffer] = await Promise.all([
+
+        const [applePassBuffer, googleObjectCreated] = await Promise.all([
             generateApplePass(serialNumber, name.trim(), email.trim(), 0),
-            // Google Wallet object creation is non-blocking — don't wait for it
             canGoogle
                 ? createGooglePassObject(googleObjectId, name.trim(), email.toLowerCase().trim(), 0)
-                    .catch(err => console.error('Google Wallet object creation failed (non-fatal):', err))
-                : Promise.resolve(),
+                : Promise.resolve(false),
         ]);
 
-        // Generate Google save URL (fast — just signs a JWT locally)
-        if (canGoogle) {
+        // Only generate the save URL if the server-side object was actually created.
+        // If the object doesn't exist, the URL will fail when the user taps "Save".
+        if (googleObjectCreated) {
             try {
                 googleSaveUrl = buildGoogleSaveUrl(googleObjectId);
             } catch (err) {
-                console.error('Google Wallet JWT failed:', err);
+                console.error('[GWallet] JWT sign failed:', err);
             }
         }
 
