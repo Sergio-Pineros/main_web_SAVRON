@@ -42,7 +42,7 @@ export default function AdminBarbersPage() {
     };
 
     const copyRegistrationLink = () => {
-        navigator.clipboard.writeText(`${window.location.origin}/barber/register`);
+        navigator.clipboard.writeText(`${window.location.origin}/join`);
         setCopiedReg(true);
         setTimeout(() => setCopiedReg(false), 2000);
     };
