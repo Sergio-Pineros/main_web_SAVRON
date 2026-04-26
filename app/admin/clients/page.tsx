@@ -31,6 +31,7 @@ export default function ClientsPage() {
     const [showAdd, setShowAdd] = useState(false);
     const [newClient, setNewClient] = useState({ name: '', email: '', phone: '', notes: '', preferences: '' });
     const [showDelete, setShowDelete] = useState<string | null>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
 
     // Bulk selection
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -56,11 +57,13 @@ export default function ClientsPage() {
 
     async function fetchClients() {
         setLoading(true);
-        let query = supabase.from('clients').select('*').order('created_at', { ascending: false });
-        if (search) {
-            // Fetch all and filter in JS to avoid ilike issues
+        setFetchError(null);
+        const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+        if (error) {
+            setFetchError(error.message);
+            setLoading(false);
+            return;
         }
-        const { data } = await query;
         let result = data ?? [];
         if (search) {
             const s = search.toLowerCase();
@@ -298,6 +301,12 @@ export default function ClientsPage() {
             </div>
 
             {/* Table */}
+            {fetchError && (
+                <div className="p-4 border border-red-500/30 bg-red-500/10 rounded-savron text-red-400 text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Failed to load clients: {fetchError}</span>
+                </div>
+            )}
             {loading ? (
                 <div className="flex items-center justify-center h-48">
                     <div className="w-6 h-6 border-2 border-savron-green/30 border-t-savron-green rounded-full animate-spin" />

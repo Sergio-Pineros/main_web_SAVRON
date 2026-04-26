@@ -47,7 +47,11 @@ export async function middleware(request: NextRequest) {
     // =============================================
     // BARBER routes — redirect to /barber/login
     // =============================================
-    if (pathname.startsWith('/barber') && !pathname.startsWith('/barber/login')) {
+    if (
+        pathname.startsWith('/barber') &&
+        !pathname.startsWith('/barber/login') &&
+        !pathname.startsWith('/barber/register')
+    ) {
         if (!user) {
             return NextResponse.redirect(new URL('/barber/login', request.url));
         }
