@@ -142,14 +142,15 @@ function buildGooglePassObject(
     };
 }
 
-function buildGoogleSaveUrl(objectId: string, name: string, email: string, visitCount: number): string {
-    const passObject = buildGooglePassObject(objectId, name, email, visitCount);
+// After creating the server-side object, the JWT must only REFERENCE it by ID.
+// Embedding the full object causes a 409 (already exists) error when the user taps "Save".
+function buildGoogleSaveUrl(objectId: string): string {
     const jwtPayload = {
         iss: SERVICE_ACCOUNT_EMAIL,
         aud: 'google',
         typ: 'savetowallet',
         iat: Math.floor(Date.now() / 1000),
-        payload: { genericObjects: [passObject] },
+        payload: { genericObjects: [{ id: objectId }] },
     };
     const token = jwt.sign(jwtPayload, GOOGLE_PRIVATE_KEY!, { algorithm: 'RS256' });
     return `https://pay.google.com/gp/v/save/${token}`;
@@ -276,7 +277,7 @@ export async function POST(req: NextRequest) {
         // Generate Google save URL (fast — just signs a JWT locally)
         if (canGoogle) {
             try {
-                googleSaveUrl = buildGoogleSaveUrl(googleObjectId, name.trim(), email.trim(), 0);
+                googleSaveUrl = buildGoogleSaveUrl(googleObjectId);
             } catch (err) {
                 console.error('Google Wallet JWT failed:', err);
             }

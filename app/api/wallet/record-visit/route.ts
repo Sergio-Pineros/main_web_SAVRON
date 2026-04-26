@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleAuth } from 'google-auth-library';
 import { PKPass } from 'passkit-generator';
 import { Resend } from 'resend';
+import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 
@@ -16,6 +17,23 @@ function getSupabaseAdmin() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+}
+
+function buildGoogleSaveUrl(objectId: string): string | null {
+    if (!SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) return null;
+    try {
+        const jwtPayload = {
+            iss: SERVICE_ACCOUNT_EMAIL,
+            aud: 'google',
+            typ: 'savetowallet',
+            iat: Math.floor(Date.now() / 1000),
+            payload: { genericObjects: [{ id: objectId }] },
+        };
+        const token = jwt.sign(jwtPayload, GOOGLE_PRIVATE_KEY, { algorithm: 'RS256' });
+        return `https://pay.google.com/gp/v/save/${token}`;
+    } catch {
+        return null;
+    }
 }
 
 async function updateGoogleWalletPass(
@@ -63,127 +81,126 @@ async function updateGoogleWalletPass(
     });
 }
 
-async function resendApplePass(
+async function resendFullPass(
     serialNumber: string,
+    googleObjectId: string | null,
     name: string,
     email: string,
     visitCount: number
 ): Promise<void> {
-    const WALLET_PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
-    const WALLET_WWDR_CERT = process.env.WALLET_WWDR_CERT;
-    const PASSPHRASE = process.env.WALLET_PASSPHRASE;
-    const PASS_TYPE_ID = process.env.PASS_TYPE_ID;
-    const TEAM_ID = process.env.TEAM_ID;
-
-    if (!WALLET_PRIVATE_KEY || !WALLET_WWDR_CERT || !PASS_TYPE_ID || !TEAM_ID) return;
-
-    const signerKey = Buffer.from(WALLET_PRIVATE_KEY, 'base64');
-    const wwdrCert = Buffer.from(WALLET_WWDR_CERT, 'base64');
-
-    const buffers: Record<string, Buffer> = {};
-    const logoPath = path.join(process.cwd(), 'public', 'logo.png');
-    if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        buffers['logo.png'] = logoBuffer;
-        buffers['icon.png'] = logoBuffer;
-    }
-
-    const pass = new PKPass(buffers, {
-        wwdr: wwdrCert,
-        signerCert: signerKey,
-        signerKey: signerKey,
-        signerKeyPassphrase: PASSPHRASE,
-    }, {
-        description: 'SAVRON Membership',
-        organizationName: 'SAVRON',
-        passTypeIdentifier: PASS_TYPE_ID,
-        teamIdentifier: TEAM_ID,
-        serialNumber,
-        backgroundColor: 'rgb(20, 20, 18)',
-        labelColor: 'rgb(140, 136, 128)',
-        foregroundColor: 'rgb(232, 228, 220)',
-        logoText: 'SAVRON',
-        userInfo: { email },
-    });
-
-    pass.type = 'storeCard';
-    pass.primaryFields.push({ key: 'tier', label: 'MEMBER', value: 'SAVRON MEMBER' });
-    pass.secondaryFields.push({ key: 'name', label: 'NAME', value: name });
-    pass.auxiliaryFields.push(
-        { key: 'visits', label: 'VISITS', value: visitCount.toString() },
-        { key: 'email', label: 'EMAIL', value: email, textAlignment: 'PKTextAlignmentRight' }
-    );
-
-    const passBuffer = await pass.getAsBuffer() as unknown as Buffer;
     const resend = new Resend(process.env.RESEND_API_KEY!);
     const firstName = name.split(' ')[0];
 
-    // Read logo for inline embedding
-    const emailLogoPath = path.join(process.cwd(), 'public', 'logo.png');
-    const emailLogoBuffer = fs.existsSync(emailLogoPath) ? fs.readFileSync(emailLogoPath) : null;
-    const logoSrc = emailLogoBuffer ? 'cid:savron_logo' : 'https://savronmn.com/logo.png';
+    // Google Wallet — just reference the existing server-side object by ID
+    const googleSaveUrl = googleObjectId ? buildGoogleSaveUrl(googleObjectId) : null;
 
-    const emailAttachments: Array<{ filename: string; content: Buffer; content_id?: string }> = [];
-    if (emailLogoBuffer) {
-        emailAttachments.push({ filename: 'logo.png', content: emailLogoBuffer, content_id: 'savron_logo' });
+    // Apple Wallet — non-fatal; send without attachment if generation fails
+    let applePassBuffer: Buffer | null = null;
+    try {
+        const WALLET_PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY;
+        const WALLET_WWDR_CERT   = process.env.WALLET_WWDR_CERT;
+        const PASSPHRASE         = process.env.WALLET_PASSPHRASE;
+        const PASS_TYPE_ID       = process.env.PASS_TYPE_ID;
+        const TEAM_ID            = process.env.TEAM_ID;
+
+        if (WALLET_PRIVATE_KEY && WALLET_WWDR_CERT && PASS_TYPE_ID && TEAM_ID) {
+            const signerKey = Buffer.from(WALLET_PRIVATE_KEY, 'base64');
+            const wwdrCert  = Buffer.from(WALLET_WWDR_CERT,   'base64');
+            const logoPath  = path.join(process.cwd(), 'public', 'logo.png');
+            const buffers: Record<string, Buffer> = {};
+            if (fs.existsSync(logoPath)) {
+                const logoBuffer = fs.readFileSync(logoPath);
+                buffers['logo.png'] = logoBuffer;
+                buffers['icon.png'] = logoBuffer;
+            }
+            const pass = new PKPass(buffers, {
+                wwdr: wwdrCert,
+                signerCert: signerKey,
+                signerKey: signerKey,
+                signerKeyPassphrase: PASSPHRASE,
+            }, {
+                description: 'SAVRON Membership',
+                organizationName: 'SAVRON',
+                passTypeIdentifier: PASS_TYPE_ID,
+                teamIdentifier: TEAM_ID,
+                serialNumber,
+                backgroundColor: 'rgb(20, 20, 18)',
+                labelColor: 'rgb(140, 136, 128)',
+                foregroundColor: 'rgb(232, 228, 220)',
+                logoText: 'SAVRON',
+                userInfo: { email },
+            });
+            pass.type = 'storeCard';
+            pass.primaryFields.push({ key: 'tier', label: 'MEMBER', value: 'SAVRON MEMBER' });
+            pass.secondaryFields.push({ key: 'name', label: 'NAME', value: name });
+            pass.auxiliaryFields.push(
+                { key: 'visits', label: 'VISITS', value: visitCount.toString() },
+                { key: 'email', label: 'EMAIL', value: email, textAlignment: 'PKTextAlignmentRight' }
+            );
+            applePassBuffer = pass.getAsBuffer() as unknown as Buffer;
+        }
+    } catch (err) {
+        console.error('Apple pass generation failed (non-fatal):', err);
     }
-    emailAttachments.push({
-        filename: `${name.replace(/\s+/g, '_')}_savron_pass.pkpass`,
-        content: passBuffer,
-    });
+
+    // Build attachments
+    const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+    const logoBuffer = fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
+    const attachments: Array<{ filename: string; content: Buffer; content_id?: string }> = [];
+    if (logoBuffer) attachments.push({ filename: 'logo.png', content: logoBuffer, content_id: 'savron_logo' });
+    if (applePassBuffer) attachments.push({ filename: `${name.replace(/\s+/g, '_')}_savron_pass.pkpass`, content: applePassBuffer });
+
+    const logoSrc = logoBuffer ? 'cid:savron_logo' : 'https://savronmn.com/logo.png';
+    const googleBtn = googleSaveUrl
+        ? `<a href="${googleSaveUrl}" style="display:block;text-align:center;background:#0D3B4F;color:#fff;padding:14px 28px;text-decoration:none;font-family:Arial,sans-serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Save to Google Wallet &rarr;</a>`
+        : '';
 
     await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL || 'noreply@savronmn.com',
         to: email,
-        subject: `SAVRON — Updated Membership Pass (${visitCount} visit${visitCount === 1 ? '' : 's'})`,
+        subject: `SAVRON — Your Updated Membership Pass (${visitCount} visit${visitCount === 1 ? '' : 's'})`,
+        attachments,
         html: `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
+<html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#050505;font-family:Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;padding:40px 20px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);">
-        <!-- Header -->
-        <tr>
-          <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
-            <img src="${logoSrc}" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
-            <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
-          </td>
-        </tr>
-        <!-- Body -->
-        <tr>
-          <td style="padding:36px 32px;">
-            <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Pass Updated</p>
-            <h1 style="margin:0 0 28px;color:#fff;font-size:26px;letter-spacing:2px;text-transform:uppercase;">${firstName}, your pass has been updated.</h1>
-
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:28px;">
-              <tr>
-                <td style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.05);">
-                  <span style="color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Total Visits</span><br>
-                  <span style="color:#1A6A8A;font-size:18px;font-weight:700;">${visitCount} visit${visitCount === 1 ? '' : 's'}</span>
-                </td>
-              </tr>
-            </table>
-
-            <p style="margin:0 0 6px;color:rgba(255,255,255,0.4);font-size:12px;line-height:1.6;">
-              Open the <strong style="color:rgba(255,255,255,0.7);">.pkpass</strong> attachment below to update your Apple Wallet pass.
-            </p>
-          </td>
-        </tr>
-        <!-- Footer -->
-        <tr>
-          <td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.05);">
-            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:11px;letter-spacing:1px;">
-              SAVRON Barbershop &amp; Lounge · Minneapolis, MN · <a href="https://savronmn.com" style="color:rgba(255,255,255,0.3);">savronmn.com</a>
-            </p>
-          </td>
-        </tr>
+        <tr><td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
+          <img src="${logoSrc}" alt="SAVRON" width="140" style="display:block;margin:0 auto 8px;" />
+          <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
+        </td></tr>
+        <tr><td style="padding:36px 32px;">
+          <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Pass Updated</p>
+          <h1 style="margin:0 0 20px;color:#fff;font-size:24px;letter-spacing:2px;text-transform:uppercase;">${firstName}, your pass has been updated.</h1>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:24px;">
+            <tr><td style="padding:14px 20px;">
+              <span style="color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Total Visits</span><br>
+              <span style="color:#1A6A8A;font-size:22px;font-weight:700;">${visitCount} visit${visitCount === 1 ? '' : 's'}</span>
+            </td></tr>
+          </table>
+          ${googleSaveUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;">
+            <tr><td style="padding:20px 24px;">
+              <p style="margin:0 0 12px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Google Wallet</p>
+              ${googleBtn}
+            </td></tr>
+          </table>` : ''}
+          ${applePassBuffer ? `
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:24px;">
+            <tr><td style="padding:20px 24px;">
+              <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Apple Wallet</p>
+              <p style="margin:0;color:rgba(255,255,255,0.5);font-size:13px;">Open on iPhone and tap the <strong style="color:rgba(255,255,255,0.7);">.pkpass</strong> attachment to update your pass.</p>
+            </td></tr>
+          </table>` : ''}
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.05);">
+          <p style="margin:0;color:rgba(255,255,255,0.2);font-size:11px;">SAVRON · Minneapolis, MN · <a href="https://savronmn.com" style="color:rgba(255,255,255,0.3);">savronmn.com</a></p>
+        </td></tr>
       </table>
     </td></tr>
   </table>
-</body>
-</html>`,
-        attachments: emailAttachments,
+</body></html>`,
     });
 }
 
@@ -272,14 +289,15 @@ export async function POST(req: NextRequest) {
 
         if (action === 'send_updated_pass') {
             try {
-                await resendApplePass(
+                await resendFullPass(
                     subscriber.pass_serial_number,
+                    subscriber.google_pass_object_id ?? null,
                     subscriber.name,
                     subscriber.email,
                     subscriber.visit_count
                 );
             } catch (err) {
-                console.error('Apple pass resend failed:', err);
+                console.error('Pass resend failed:', err);
                 return NextResponse.json({ error: 'Failed to resend pass' }, { status: 500 });
             }
 
