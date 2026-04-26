@@ -183,29 +183,39 @@ export async function POST(req: NextRequest) {
         });
 
         if (dbError) {
-            console.error('DB insert failed:', dbError);
-            return NextResponse.json({ error: 'Failed to save subscriber' }, { status: 500 });
+            console.error('DB insert failed:', JSON.stringify(dbError, null, 2));
+            return NextResponse.json({
+                error: 'Failed to save subscriber',
+                debug: {
+                    message: dbError.message,
+                    code: dbError.code,
+                    details: dbError.details,
+                    hint: dbError.hint,
+                },
+            }, { status: 500 });
         }
 
-        // Create Google Wallet pass object (so it can be updated later)
-        try {
-            await createGooglePassObject(googleObjectId, name.trim(), email.toLowerCase().trim(), 0);
-        } catch (err) {
-            console.error('Google Wallet object creation failed (non-fatal):', err);
-        }
-
-        // Generate Google save URL
+        // Create Google Wallet pass object + generate Apple pass IN PARALLEL for speed
         let googleSaveUrl: string | null = null;
-        if (ISSUER_ID && SERVICE_ACCOUNT_EMAIL && GOOGLE_PRIVATE_KEY && CLASS_ID) {
+        const canGoogle = !!(ISSUER_ID && SERVICE_ACCOUNT_EMAIL && GOOGLE_PRIVATE_KEY && CLASS_ID);
+        
+        const [applePassBuffer] = await Promise.all([
+            generateApplePass(serialNumber, name.trim(), email.trim(), 0),
+            // Google Wallet object creation is non-blocking — don't wait for it
+            canGoogle
+                ? createGooglePassObject(googleObjectId, name.trim(), email.toLowerCase().trim(), 0)
+                    .catch(err => console.error('Google Wallet object creation failed (non-fatal):', err))
+                : Promise.resolve(),
+        ]);
+
+        // Generate Google save URL (fast — just signs a JWT locally)
+        if (canGoogle) {
             try {
                 googleSaveUrl = buildGoogleSaveUrl(googleObjectId, name.trim(), email.trim(), 0);
             } catch (err) {
                 console.error('Google Wallet JWT failed:', err);
             }
         }
-
-        // Generate Apple pass
-        const applePassBuffer = await generateApplePass(serialNumber, name.trim(), email.trim(), 0);
 
         const attachments = applePassBuffer
             ? [{ filename: `${name.trim().replace(/\s+/g, '_')}_savron_pass.pkpass`, content: applePassBuffer }]
