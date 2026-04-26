@@ -8,11 +8,21 @@ import {
     startOfWeek, endOfWeek, eachDayOfInterval,
     startOfMonth, endOfMonth, addWeeks, subWeeks, addMonths, subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, RefreshCw, Wifi, X, UserCheck, UserX, RotateCcw, Phone, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Wifi, X, UserCheck, UserX, RotateCcw, Phone, Scissors, Menu, LayoutDashboard, Users, CreditCard, Mail, MonitorPlay } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { Barber, Booking } from '@/lib/types';
 import { SERVICE_COLORS, TIME_SLOTS } from '@/lib/services-data';
+
+const NAV_ITEMS = [
+    { label: 'Dashboard',      href: '/admin',                icon: LayoutDashboard },
+    { label: 'Host View',      href: '/host',                 icon: MonitorPlay },
+    { label: 'Barbers',        href: '/admin/barbers',        icon: Scissors },
+    { label: 'Clients',        href: '/admin/clients',        icon: Users },
+    { label: 'Membership',     href: '/admin/membership',     icon: CreditCard },
+    { label: 'Communications', href: '/admin/communications', icon: Mail },
+];
 
 type CalView = 'day' | 'week' | 'month';
 
@@ -28,6 +38,9 @@ export default function HostDashboard() {
     // Appointment detail modal
     const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
     const [updating, setUpdating] = useState(false);
+
+    // Burger nav
+    const [showNav, setShowNav] = useState(false);
 
     const [rangeStart, rangeEnd] = useMemo(() => {
         if (view === 'day') {
@@ -176,10 +189,15 @@ export default function HostDashboard() {
     return (
         <div className="min-h-screen bg-savron-black flex flex-col">
 
-            {/* ── Header ── */}
-            <header className="bg-savron-grey border-b border-white/5 px-6 py-4 flex items-center justify-between shrink-0 gap-4 flex-wrap">
-
-                <div className="flex items-center gap-4">
+            {/* ── Row 1: main bar ── */}
+            <header className="bg-savron-grey border-b border-white/5 px-6 py-3 flex items-center justify-between shrink-0 gap-4">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowNav(true)}
+                        className="p-2 -ml-1 text-savron-silver hover:text-white transition-colors"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
                     <h1 className="font-heading text-xl uppercase tracking-widest text-white">Host View</h1>
                     <div className="flex items-center gap-1.5">
                         <Wifi className={cn("w-3 h-3", realtimeConnected ? "text-savron-green" : "text-savron-silver/40")} />
@@ -187,31 +205,6 @@ export default function HostDashboard() {
                             {realtimeConnected ? "Live" : "Connecting…"}
                         </span>
                     </div>
-                    <div className="flex border border-white/10 rounded-savron overflow-hidden">
-                        {(['day', 'week', 'month'] as CalView[]).map(v => (
-                            <button key={v} onClick={() => setView(v)}
-                                className={cn("px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all",
-                                    view === v ? "bg-savron-green/15 text-savron-green" : "text-savron-silver hover:text-white hover:bg-white/5"
-                                )}>
-                                {v}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button onClick={prev} className="p-2 text-savron-silver hover:text-white transition-colors"><ChevronLeft className="w-4 h-4" /></button>
-                    <div className="text-center min-w-[160px]">
-                        <p className="text-white font-heading uppercase tracking-widest text-sm">{headingLabel}</p>
-                        <p className="text-savron-silver text-xs uppercase tracking-widest">{subLabel}</p>
-                    </div>
-                    <button onClick={next} className="p-2 text-savron-silver hover:text-white transition-colors"><ChevronRight className="w-4 h-4" /></button>
-                    {!isToday(selectedDate) && (
-                        <button onClick={() => setSelectedDate(new Date())}
-                            className="text-xs uppercase tracking-widest text-savron-green hover:text-white transition-colors px-3 py-1 border border-savron-green/30 rounded-savron">
-                            Today
-                        </button>
-                    )}
                 </div>
 
                 <div className="flex items-center gap-6">
@@ -221,6 +214,80 @@ export default function HostDashboard() {
                     <button onClick={fetchBookings} className="p-2 text-savron-silver hover:text-white transition-colors"><RefreshCw className="w-4 h-4" /></button>
                 </div>
             </header>
+
+            {/* ── Row 2: date nav + view toggle ── */}
+            <div className="bg-savron-grey border-b border-white/[0.04] px-6 py-2 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                    <button onClick={prev} className="p-1.5 text-savron-silver hover:text-white transition-colors"><ChevronLeft className="w-4 h-4" /></button>
+                    <div className="text-center min-w-[148px]">
+                        <p className="text-white font-heading uppercase tracking-widest text-sm leading-none">{headingLabel}</p>
+                        <p className="text-savron-silver/50 text-[10px] uppercase tracking-widest mt-0.5">{subLabel}</p>
+                    </div>
+                    <button onClick={next} className="p-1.5 text-savron-silver hover:text-white transition-colors"><ChevronRight className="w-4 h-4" /></button>
+                    {!isToday(selectedDate) && (
+                        <button onClick={() => setSelectedDate(new Date())}
+                            className="ml-1 text-[10px] uppercase tracking-widest text-savron-green hover:text-white transition-colors px-2.5 py-1 border border-savron-green/30 rounded-savron">
+                            Today
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex border border-white/10 rounded-savron overflow-hidden">
+                    {(['day', 'week', 'month'] as CalView[]).map(v => (
+                        <button key={v} onClick={() => setView(v)}
+                            className={cn("px-3 py-1.5 text-[10px] uppercase tracking-widest transition-all",
+                                view === v ? "bg-savron-green/15 text-savron-green" : "text-savron-silver hover:text-white hover:bg-white/5"
+                            )}>
+                            {v}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Burger nav drawer ── */}
+            <AnimatePresence>
+                {showNav && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+                            onClick={() => setShowNav(false)}
+                        />
+                        <motion.nav
+                            initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
+                            transition={{ type: 'tween', duration: 0.2 }}
+                            className="fixed top-0 left-0 h-full w-64 bg-savron-grey border-r border-white/5 z-50 flex flex-col"
+                        >
+                            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                                <div className="relative w-24 h-6">
+                                    <Image src="/logo.png" alt="SAVRON" fill className="object-contain object-left" />
+                                </div>
+                                <button onClick={() => setShowNav(false)} className="text-savron-silver hover:text-white transition-colors">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="flex-1 py-4 px-3 space-y-1">
+                                {NAV_ITEMS.map(item => (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        onClick={() => setShowNav(false)}
+                                        className={cn(
+                                            "flex items-center gap-3 px-3 py-3 rounded-savron text-sm uppercase tracking-wider transition-all",
+                                            item.href === '/host'
+                                                ? "bg-savron-green/15 text-savron-green border border-savron-green/20"
+                                                : "text-savron-silver hover:text-white hover:bg-white/5 border border-transparent"
+                                        )}
+                                    >
+                                        <item.icon className="w-4 h-4" />
+                                        {item.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        </motion.nav>
+                    </>
+                )}
+            </AnimatePresence>
 
             {loading ? (
                 <div className="flex-1 flex items-center justify-center">
@@ -265,20 +332,6 @@ export default function HostDashboard() {
                                 ))}
                             </div>
 
-                            <div className="sticky bottom-0 bg-savron-black border-t border-white/5 px-6 py-3 flex items-center gap-6 flex-wrap">
-                                <span className="text-[10px] uppercase tracking-widest text-savron-silver/40">Legend:</span>
-                                {Object.entries(SERVICE_COLORS).map(([name, cls]) => (
-                                    <div key={name} className="flex items-center gap-2">
-                                        <div className={cn("w-2.5 h-2.5 rounded-full border", cls)} />
-                                        <span className="text-[10px] text-savron-silver/60 uppercase tracking-widest">{name}</span>
-                                    </div>
-                                ))}
-                                <div className="ml-auto flex items-center gap-4">
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-savron-green" /><span className="text-[10px] text-savron-silver/60 uppercase tracking-widest">Confirmed</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-[10px] text-savron-silver/60 uppercase tracking-widest">Done</span></div>
-                                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-[10px] text-savron-silver/60 uppercase tracking-widest">No-show</span></div>
-                                </div>
-                            </div>
                         </div>
                     )}
 
