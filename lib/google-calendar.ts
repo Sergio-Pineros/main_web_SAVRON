@@ -82,7 +82,7 @@ export async function createCalendarEvent(
         description?: string;
         startIso: string;  // "2026-04-01T10:00:00-05:00"
         endIso: string;
-        attendeeEmail?: string;
+        attendeeEmails?: string[];
     }
 ): Promise<string> {
     const body: Record<string, unknown> = {
@@ -91,12 +91,12 @@ export async function createCalendarEvent(
         start: { dateTime: event.startIso, timeZone: 'America/Chicago' },
         end: { dateTime: event.endIso, timeZone: 'America/Chicago' },
     };
-    if (event.attendeeEmail) {
-        body.attendees = [{ email: event.attendeeEmail }];
+    if (event.attendeeEmails && event.attendeeEmails.length > 0) {
+        body.attendees = event.attendeeEmails.map(email => ({ email }));
     }
 
     const res = await fetch(
-        `${GOOGLE_CALENDAR_BASE}/calendars/${encodeURIComponent(calendarId)}/events`,
+        `${GOOGLE_CALENDAR_BASE}/calendars/${encodeURIComponent(calendarId)}/events?sendUpdates=all`,
         {
             method: 'POST',
             headers: {

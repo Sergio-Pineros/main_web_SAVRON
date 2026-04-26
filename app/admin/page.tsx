@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import StatCard from '@/components/crm/StatCard';
-import { Users, Calendar, DollarSign, Clock, ArrowRight, TrendingUp, Scissors } from 'lucide-react';
+import { Users, Calendar, DollarSign, Clock, ArrowRight, TrendingUp, Scissors, UserCheck } from 'lucide-react';
 import type { Booking, Client } from '@/lib/types';
 import { format, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -239,6 +239,7 @@ export default function AdminDashboard() {
                 {[
                     { label: 'Bookings', href: '/admin/bookings', icon: Calendar, desc: 'Calendar & walk-ins' },
                     { label: 'Clients', href: '/admin/clients', icon: Users, desc: 'CRM & campaigns' },
+                    { label: 'Membership', href: '/admin/membership', icon: UserCheck, desc: 'E-pass & visits' },
                     { label: 'Barbers', href: '/admin/barbers', icon: Scissors, desc: 'Team management' },
                     { label: 'Host View', href: '/host', icon: TrendingUp, desc: 'Display screen' },
                 ].map(item => (

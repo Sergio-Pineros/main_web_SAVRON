@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // Fetch booking + barber info
     const { data: booking } = await supabaseAdmin
         .from('bookings')
-        .select('*, barbers(name, google_calendar_id, google_calendar_tokens)')
+        .select('*, barbers(name, email, google_calendar_id, google_calendar_tokens)')
         .eq('id', bookingId)
         .single();
 
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
 
     const barber = booking.barbers as {
         name: string;
+        email: string | null;
         google_calendar_id: string | null;
         google_calendar_tokens: CalendarToken | null;
     } | null;
@@ -92,12 +93,18 @@ export async function POST(request: NextRequest) {
         `Price: ${booking.price ?? ''}`,
     ].filter(Boolean).join('\n');
 
+    // Build attendees list: client + barbershop + barber email (if different from calendar owner)
+    const attendees: string[] = [];
+    if (booking.client_email) attendees.push(booking.client_email);
+    attendees.push('info@savronmn.com'); // Barbershop / receptionist
+    if (barber?.email) attendees.push(barber.email);
+
     const eventId = await createCalendarEvent(accessToken, barber.google_calendar_id, {
         summary,
         description,
         startIso,
         endIso,
-        attendeeEmail: booking.client_email ?? undefined,
+        attendeeEmails: attendees,
     });
 
     // Store the Google event ID in the booking for future updates/deletes

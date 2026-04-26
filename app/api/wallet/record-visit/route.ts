@@ -119,12 +119,53 @@ async function resendApplePass(
         from: process.env.RESEND_FROM_EMAIL || 'noreply@savronmn.com',
         to: email,
         subject: `SAVRON — Updated Membership Pass (${visitCount} visit${visitCount === 1 ? '' : 's'})`,
-        html: `<div style="background:#141412;color:#e8e4dc;font-family:Helvetica,Arial,sans-serif;padding:48px 32px;max-width:540px;margin:0 auto;">
-<p style="font-size:9px;letter-spacing:0.4em;text-transform:uppercase;color:rgba(232,228,220,0.3);margin:0 0 32px;">SAVRON &mdash; Pass Updated</p>
-<h1 style="font-family:Georgia,serif;font-size:42px;font-weight:400;color:#e8e4dc;margin:0 0 24px;">${firstName}, your pass has been updated.</h1>
-<p style="font-size:14px;font-weight:300;line-height:1.8;color:rgba(232,228,220,0.5);margin:0 0 32px;">Your SAVRON pass now reflects <strong style="color:rgba(232,228,220,0.75);">${visitCount} visit${visitCount === 1 ? '' : 's'}</strong>. Open the attachment below to update Apple Wallet.</p>
-<p style="font-size:9px;letter-spacing:0.32em;text-transform:uppercase;color:rgba(232,228,220,0.2);margin:0;">North Loop &middot; Minneapolis</p>
-</div>`,
+        html: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#050505;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
+            <img src="https://savronmn.com/logo.png" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
+            <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 32px;">
+            <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Pass Updated</p>
+            <h1 style="margin:0 0 28px;color:#fff;font-size:26px;letter-spacing:2px;text-transform:uppercase;">${firstName}, your pass has been updated.</h1>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:28px;">
+              <tr>
+                <td style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <span style="color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Total Visits</span><br>
+                  <span style="color:#1A6A8A;font-size:18px;font-weight:700;">${visitCount} visit${visitCount === 1 ? '' : 's'}</span>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 6px;color:rgba(255,255,255,0.4);font-size:12px;line-height:1.6;">
+              Open the <strong style="color:rgba(255,255,255,0.7);">.pkpass</strong> attachment below to update your Apple Wallet pass.
+            </p>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.05);">
+            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:11px;letter-spacing:1px;">
+              SAVRON Barbershop &amp; Lounge · Minneapolis, MN · <a href="https://savronmn.com" style="color:rgba(255,255,255,0.3);">savronmn.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
         attachments: [{
             filename: `${name.replace(/\s+/g, '_')}_savron_pass.pkpass`,
             content: passBuffer,

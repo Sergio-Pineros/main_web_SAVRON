@@ -1,5 +1,5 @@
 // Pre-built HTML email templates for CRM campaigns
-// All templates match the booking confirmation email style
+// All templates match the booking confirmation email style with blue (#0D3B4F) header
 
 const LOGO_URL = 'https://savronmn.com/logo.png';
 
@@ -13,7 +13,7 @@ function wrapTemplate(innerHtml: string): string {
       <table width="560" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);">
         <!-- Header -->
         <tr>
-          <td style="background:#1B4332;padding:28px 32px;text-align:center;">
+          <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
             <img src="${LOGO_URL}" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
             <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
           </td>
@@ -51,7 +51,7 @@ export function getMissYouTemplate(clientName: string): { subject: string; html:
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
-                    <td style="background:#1B4332;padding:14px 28px;">
+                    <td style="background:#0D3B4F;padding:14px 28px;">
                         <a href="https://savronmn.com/booking" style="color:#fff;text-decoration:none;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Book Now</a>
                     </td>
                 </tr>
@@ -73,7 +73,7 @@ export function getSpecialOfferTemplate(clientName: string, offerText: string): 
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:24px;">
                 <tr>
                     <td style="padding:20px 24px;text-align:center;">
-                        <p style="margin:0;color:#4ade80;font-size:18px;font-weight:700;letter-spacing:2px;">${offerText}</p>
+                        <p style="margin:0;color:#1A6A8A;font-size:18px;font-weight:700;letter-spacing:2px;">${offerText}</p>
                     </td>
                 </tr>
             </table>
@@ -82,7 +82,7 @@ export function getSpecialOfferTemplate(clientName: string, offerText: string): 
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
-                    <td style="background:#1B4332;padding:14px 28px;">
+                    <td style="background:#0D3B4F;padding:14px 28px;">
                         <a href="https://savronmn.com/booking" style="color:#fff;text-decoration:none;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Book Now</a>
                     </td>
                 </tr>
@@ -106,7 +106,7 @@ export function getCustomTemplate(clientName: string, subject: string, message: 
             </p>
             <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
                 <tr>
-                    <td style="background:#1B4332;padding:14px 28px;">
+                    <td style="background:#0D3B4F;padding:14px 28px;">
                         <a href="https://savronmn.com/booking" style="color:#fff;text-decoration:none;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Book Now</a>
                     </td>
                 </tr>

@@ -234,182 +234,88 @@ function buildEmailHtml(name: string, googleSaveUrl: string | null): string {
     const firstName = name.split(' ')[0];
 
     const googleBtn = googleSaveUrl
-        ? `<a href="${googleSaveUrl}" style="display:block;text-align:center;border:1px solid rgba(232,228,220,0.18);color:rgba(232,228,220,0.65);padding:16px 32px;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;font-weight:400;background:rgba(232,228,220,0.03);">Save to Google Wallet &nbsp;&rarr;</a>`
+        ? `<a href="${googleSaveUrl}" style="display:block;text-align:center;background:#0D3B4F;color:#fff;padding:14px 28px;text-decoration:none;font-family:Arial,sans-serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Save to Google Wallet &rarr;</a>`
         : '';
 
     return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SAVRON — Your Membership Pass</title>
-</head>
-<body style="margin:0;padding:0;background-color:#141412;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#141412;">
-    <tr>
-      <td>
-        <table width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td style="width:33%;height:2px;background:#141412;"></td>
-            <td style="width:34%;height:2px;background:rgba(232,228,220,0.18);"></td>
-            <td style="width:33%;height:2px;background:#141412;"></td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" style="padding:56px 20px 0;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
-          <tr>
-            <td style="padding-bottom:44px;border-bottom:1px solid rgba(232,228,220,0.07);">
-              <img src="https://savronmn.com/logo.png" alt="SAVRON" width="120"
-                   style="display:block;border:0;opacity:0.9;" />
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-top:44px;padding-bottom:18px;">
-              <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:9px;
-                        letter-spacing:0.4em;text-transform:uppercase;
-                        color:rgba(232,228,220,0.28);font-weight:400;">
-                001 &mdash; Access Confirmed
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:24px;">
-              <h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;
-                         font-size:52px;font-weight:400;line-height:1.0;
-                         letter-spacing:-0.02em;color:#e8e4dc;">
-                Your pass<br/>is ready.
-              </h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:44px;">
-              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;
-                         font-style:italic;font-size:18px;font-weight:400;
-                         line-height:1.65;color:rgba(232,228,220,0.42);">
-                &ldquo;Some things are not announced.<br/>They are simply experienced.&rdquo;
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:44px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="width:40%;height:1px;background:rgba(232,228,220,0.1);"></td>
-                  <td style="width:60%;height:1px;background:transparent;"></td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:52px;">
-              <p style="margin:0 0 18px 0;font-family:Helvetica,Arial,sans-serif;
-                         font-size:15px;font-weight:300;line-height:1.0;
-                         color:rgba(232,228,220,0.5);">
-                ${firstName},
-              </p>
-              <p style="margin:0 0 18px 0;font-family:Helvetica,Arial,sans-serif;
-                         font-size:15px;font-weight:300;line-height:1.85;
-                         color:rgba(232,228,220,0.5);">
-                Your SAVRON membership pass has been issued. Save it to your wallet — it will be there when you need it, quiet and precise.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:18px;">
-              <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:9px;
-                        letter-spacing:0.4em;text-transform:uppercase;
-                        color:rgba(232,228,220,0.28);font-weight:400;">
-                002 &mdash; Add to Wallet
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding-bottom:8px;">
-              <table width="100%" cellpadding="0" cellspacing="0"
-                     style="border:1px solid rgba(232,228,220,0.09);background:rgba(232,228,220,0.025);">
-                <tr>
-                  <td style="padding:24px 28px;">
-                    <p style="margin:0 0 8px 0;font-family:Helvetica,Arial,sans-serif;
-                               font-size:9px;letter-spacing:0.3em;text-transform:uppercase;
-                               color:rgba(232,228,220,0.35);font-weight:400;">
-                      Apple Wallet
-                    </p>
-                    <p style="margin:0;font-family:Helvetica,Arial,sans-serif;
-                               font-size:13px;font-weight:300;line-height:1.75;
-                               color:rgba(232,228,220,0.4);">
-                      Open this email on your iPhone and tap the
-                      <span style="color:rgba(232,228,220,0.6);">.pkpass</span>
-                      attachment below to add directly to Apple Wallet.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          ${googleSaveUrl ? `
-          <tr>
-            <td style="padding-bottom:0;">
-              <table width="100%" cellpadding="0" cellspacing="0"
-                     style="border:1px solid rgba(232,228,220,0.09);background:rgba(232,228,220,0.025);">
-                <tr>
-                  <td style="padding:24px 28px;">
-                    <p style="margin:0 0 16px 0;font-family:Helvetica,Arial,sans-serif;
-                               font-size:9px;letter-spacing:0.3em;text-transform:uppercase;
-                               color:rgba(232,228,220,0.35);font-weight:400;">
-                      Google Wallet
-                    </p>
-                    ${googleBtn}
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          ` : ''}
-        </table>
-      </td>
-    </tr>
-    <tr>
-      <td align="center" style="padding:56px 20px 44px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
-          <tr>
-            <td style="padding-bottom:24px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="width:32%;height:1px;background:rgba(232,228,220,0.07);"></td>
-                  <td style="width:68%;height:1px;"></td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:9px;
-                               letter-spacing:0.32em;text-transform:uppercase;
-                               color:rgba(232,228,220,0.18);font-weight:400;">SAVRON</p>
-                  </td>
-                  <td align="right">
-                    <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:9px;
-                               letter-spacing:0.2em;text-transform:uppercase;
-                               color:rgba(232,228,220,0.18);font-weight:400;">
-                      North Loop &nbsp;&middot;&nbsp; Minneapolis
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    <tr>
-      <td style="height:1px;background:rgba(232,228,220,0.04);"></td>
-    </tr>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#050505;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#121212;border:1px solid rgba(255,255,255,0.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
+            <img src="https://savronmn.com/logo.png" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
+            <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 32px;">
+            <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Access Confirmed</p>
+            <h1 style="margin:0 0 28px;color:#fff;font-size:26px;letter-spacing:2px;text-transform:uppercase;">Your pass is ready, ${firstName}.</h1>
+
+            <p style="margin:0 0 28px;color:rgba(255,255,255,0.5);font-size:14px;line-height:1.7;">
+              Your SAVRON membership pass has been issued. Save it to your wallet — it tracks your visits automatically and stays with you, quiet and precise.
+            </p>
+
+            <!-- Member info card -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:28px;">
+              <tr>
+                <td style="padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <span style="color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Member</span><br>
+                  <span style="color:#fff;font-size:15px;">${name}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:14px 20px;">
+                  <span style="color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Status</span><br>
+                  <span style="color:#1A6A8A;font-size:18px;font-weight:700;">ACTIVE MEMBER</span>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Apple Wallet -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:8px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 8px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Apple Wallet</p>
+                  <p style="margin:0;color:rgba(255,255,255,0.5);font-size:13px;line-height:1.7;">
+                    Open this email on your iPhone and tap the <strong style="color:rgba(255,255,255,0.7);">.pkpass</strong> attachment below to add directly to Apple Wallet.
+                  </p>
+                </td>
+              </tr>
+            </table>
+
+            ${googleSaveUrl ? `
+            <!-- Google Wallet -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#050505;border:1px solid rgba(255,255,255,0.08);margin-bottom:28px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 12px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:2px;text-transform:uppercase;">Google Wallet</p>
+                  ${googleBtn}
+                </td>
+              </tr>
+            </table>
+            ` : ''}
+
+            <p style="margin:0 0 6px;color:rgba(255,255,255,0.4);font-size:12px;line-height:1.6;">
+              Your pass will update automatically each time you visit. Welcome to SAVRON.
+            </p>
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid rgba(255,255,255,0.05);">
+            <p style="margin:0;color:rgba(255,255,255,0.2);font-size:11px;letter-spacing:1px;">
+              SAVRON Barbershop &amp; Lounge · Minneapolis, MN · <a href="https://savronmn.com" style="color:rgba(255,255,255,0.3);">savronmn.com</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
   </table>
 </body>
 </html>`;

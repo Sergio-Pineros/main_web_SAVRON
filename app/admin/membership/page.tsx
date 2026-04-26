@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { EmailSubscriber } from '@/lib/types';
-import { motion } from 'framer-motion';
-import { Search, UserCheck, Clock, Send, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, UserCheck, Clock, Send, Plus, RefreshCw, UserPlus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function MembershipPage() {
@@ -14,6 +14,9 @@ export default function MembershipPage() {
     const [search, setSearch] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [addForm, setAddForm] = useState({ name: '', email: '', phone: '' });
+    const [addLoading, setAddLoading] = useState(false);
 
     const showToast = (text: string, type: 'success' | 'error' = 'success') => {
         setToast({ text, type });
@@ -32,6 +35,37 @@ export default function MembershipPage() {
             .order('issued_at', { ascending: false });
         if (!error && data) setSubscribers(data);
         setLoading(false);
+    }
+
+    async function handleAddMember() {
+        if (!addForm.name.trim() || !addForm.email.trim()) return;
+        setAddLoading(true);
+        try {
+            const res = await fetch('/api/wallet/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: addForm.name.trim(),
+                    email: addForm.email.trim(),
+                    phone: addForm.phone.trim() || undefined,
+                }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showToast(`${addForm.name.trim()} added — pass sent to ${addForm.email.trim()}`);
+                setAddForm({ name: '', email: '', phone: '' });
+                setShowAddForm(false);
+                fetchSubscribers();
+            } else if (res.status === 409) {
+                showToast('This email is already on the list.', 'error');
+            } else {
+                showToast(data?.error || 'Failed to add member', 'error');
+            }
+        } catch {
+            showToast('Network error', 'error');
+        } finally {
+            setAddLoading(false);
+        }
     }
 
     async function recordVisit(subscriber: EmailSubscriber) {
@@ -90,42 +124,119 @@ export default function MembershipPage() {
 
     const totalVisits = subscribers.reduce((sum, s) => sum + s.visit_count, 0);
 
+    const inputStyle = "w-full bg-white/[0.03] border border-white/[0.08] text-white placeholder-white/25 px-4 py-3 text-sm font-light tracking-wide focus:outline-none focus:border-white/20 transition-colors";
+
     return (
         <div className="min-h-screen bg-savron-black text-white">
             {/* Toast */}
-            {toast && (
-                <motion.div
-                    initial={{ opacity: 0, y: -16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -16 }}
-                    style={{
-                        position: 'fixed', top: 24, right: 24, zIndex: 9999,
-                        background: toast.type === 'success' ? 'rgba(30,50,35,0.95)' : 'rgba(60,20,20,0.95)',
-                        border: `1px solid ${toast.type === 'success' ? 'rgba(120,200,120,0.2)' : 'rgba(200,80,80,0.2)'}`,
-                        color: toast.type === 'success' ? 'rgba(175,215,170,0.9)' : 'rgba(220,130,130,0.9)',
-                        padding: '14px 20px', maxWidth: 380,
-                        fontSize: 12, fontWeight: 300, letterSpacing: '0.05em',
-                        backdropFilter: 'blur(12px)',
-                    }}
-                >
-                    {toast.text}
-                </motion.div>
-            )}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -16 }}
+                        style={{
+                            position: 'fixed', top: 24, right: 24, zIndex: 9999,
+                            background: toast.type === 'success' ? 'rgba(13,59,79,0.95)' : 'rgba(60,20,20,0.95)',
+                            border: `1px solid ${toast.type === 'success' ? 'rgba(26,106,138,0.3)' : 'rgba(200,80,80,0.2)'}`,
+                            color: toast.type === 'success' ? 'rgba(160,210,230,0.9)' : 'rgba(220,130,130,0.9)',
+                            padding: '14px 20px', maxWidth: 380,
+                            fontSize: 12, fontWeight: 300, letterSpacing: '0.05em',
+                            backdropFilter: 'blur(12px)',
+                        }}
+                    >
+                        {toast.text}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <div className="max-w-7xl mx-auto px-6 md:px-12 lg:px-24 py-12">
 
                 {/* Header */}
-                <div className="mb-10">
-                    <p className="text-[10px] uppercase tracking-[0.35em] text-white/25 mb-3">
-                        Membership
-                    </p>
-                    <h1 className="font-heading text-3xl md:text-4xl text-white uppercase tracking-wider mb-2">
-                        E-Pass Subscribers
-                    </h1>
-                    <p className="text-sm text-white/40 font-light">
-                        Manage digital passes, record visits, and track engagement.
-                    </p>
+                <div className="flex items-start justify-between mb-10 flex-wrap gap-4">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-[0.35em] text-white/25 mb-3">
+                            Membership
+                        </p>
+                        <h1 className="font-heading text-3xl md:text-4xl text-white uppercase tracking-wider mb-2">
+                            E-Pass Subscribers
+                        </h1>
+                        <p className="text-sm text-white/40 font-light">
+                            Manage digital passes, record visits, and track engagement.
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setShowAddForm(!showAddForm)}
+                            className="flex items-center gap-1.5 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-white/60 border border-white/[0.1] hover:border-savron-green/40 hover:text-white hover:bg-savron-green/5 transition-all"
+                        >
+                            <UserPlus size={12} />
+                            Add Member
+                        </button>
+                        <button
+                            onClick={fetchSubscribers}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 px-4 py-2.5 text-[10px] uppercase tracking-[0.2em] text-white/60 border border-white/[0.1] hover:border-white/25 hover:text-white transition-all disabled:opacity-40"
+                        >
+                            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    </div>
                 </div>
+
+                {/* Quick Add Form */}
+                <AnimatePresence>
+                    {showAddForm && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden mb-8"
+                        >
+                            <div className="border border-white/[0.08] bg-white/[0.02] p-6">
+                                <div className="flex items-center justify-between mb-5">
+                                    <p className="text-[10px] uppercase tracking-[0.3em] text-white/30">
+                                        Add New Member — sends pass via email
+                                    </p>
+                                    <button onClick={() => setShowAddForm(false)} className="text-white/30 hover:text-white transition-colors">
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Full Name *"
+                                        value={addForm.name}
+                                        onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                                        className={inputStyle}
+                                    />
+                                    <input
+                                        type="email"
+                                        placeholder="Email Address *"
+                                        value={addForm.email}
+                                        onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                                        className={inputStyle}
+                                    />
+                                    <input
+                                        type="tel"
+                                        placeholder="Phone (optional)"
+                                        value={addForm.phone}
+                                        onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                                        className={inputStyle}
+                                    />
+                                    <button
+                                        onClick={handleAddMember}
+                                        disabled={addLoading || !addForm.name.trim() || !addForm.email.trim()}
+                                        className="flex items-center justify-center gap-2 px-4 py-3 text-[10px] uppercase tracking-[0.2em] bg-savron-green/20 text-savron-green-light border border-savron-green/30 hover:bg-savron-green/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        <Send size={12} />
+                                        {addLoading ? 'Sending…' : 'Add & Send Pass'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-4 mb-10">
@@ -165,7 +276,7 @@ export default function MembershipPage() {
                     <div className="text-center py-20 text-white/30 text-sm tracking-widest uppercase">Loading…</div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-20 text-white/25 text-sm tracking-widest uppercase">
-                        {search ? 'No results found' : 'No subscribers yet'}
+                        {search ? 'No results found' : 'No subscribers yet — use the form above or the footer signup to add members'}
                     </div>
                 ) : (
                     <div className="border border-white/[0.07]">
@@ -220,7 +331,7 @@ export default function MembershipPage() {
                                         onClick={() => recordVisit(subscriber)}
                                         disabled={actionLoading === `visit-${subscriber.id}`}
                                         title="Record visit (+1 count, updates Google Wallet)"
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/50 border border-white/[0.1] hover:border-white/25 hover:text-white transition-all disabled:opacity-40"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] uppercase tracking-[0.2em] text-white/50 border border-white/[0.1] hover:border-savron-green/40 hover:text-savron-green-light hover:bg-savron-green/5 transition-all disabled:opacity-40"
                                     >
                                         <Plus size={10} />
                                         {actionLoading === `visit-${subscriber.id}` ? '…' : 'Visit'}
