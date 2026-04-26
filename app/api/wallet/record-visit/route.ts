@@ -34,21 +34,24 @@ async function updateGoogleWalletPass(
         scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
     });
 
+    const logoUrl = process.env.GOOGLE_WALLET_LOGO_URL || 'https://savronmn.com/logo.png';
     const client = await auth.getClient();
     const passObject = {
         id: objectId,
         classId: CLASS_ID,
+        state: 'ACTIVE',
         genericType: 'GENERIC_TYPE_UNSPECIFIED',
-        hexBackgroundColor: '#141412',
+        hexBackgroundColor: '#0D3B4F',
         logo: {
-            sourceUri: { uri: process.env.GOOGLE_WALLET_LOGO_URL || 'https://savronmn.com/logo.png' },
+            sourceUri: { uri: logoUrl },
+            contentDescription: { defaultValue: { language: 'en-US', value: 'SAVRON Logo' } },
         },
         cardTitle: { defaultValue: { language: 'en-US', value: 'SAVRON' } },
-        header: { defaultValue: { language: 'en-US', value: 'SAVRON MEMBER' } },
-        primaryFields: [{ id: 'name', label: 'NAME', value: name }],
-        secondaryFields: [
-            { id: 'visits', label: 'VISITS', value: visitCount.toString() },
-            { id: 'email', label: 'EMAIL', value: email },
+        header: { defaultValue: { language: 'en-US', value: name } },
+        subheader: { defaultValue: { language: 'en-US', value: 'MEMBER' } },
+        textModulesData: [
+            { id: 'visits', header: 'VISITS', body: visitCount.toString() },
+            { id: 'email', header: 'EMAIL', body: email },
         ],
         barcode: { type: 'QR_CODE', value: email },
     };
@@ -115,6 +118,20 @@ async function resendApplePass(
     const resend = new Resend(process.env.RESEND_API_KEY!);
     const firstName = name.split(' ')[0];
 
+    // Read logo for inline embedding
+    const emailLogoPath = path.join(process.cwd(), 'public', 'logo.png');
+    const emailLogoBuffer = fs.existsSync(emailLogoPath) ? fs.readFileSync(emailLogoPath) : null;
+    const logoSrc = emailLogoBuffer ? 'cid:savron_logo' : 'https://savronmn.com/logo.png';
+
+    const emailAttachments: Array<{ filename: string; content: Buffer; content_id?: string }> = [];
+    if (emailLogoBuffer) {
+        emailAttachments.push({ filename: 'logo.png', content: emailLogoBuffer, content_id: 'savron_logo' });
+    }
+    emailAttachments.push({
+        filename: `${name.replace(/\s+/g, '_')}_savron_pass.pkpass`,
+        content: passBuffer,
+    });
+
     await resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL || 'noreply@savronmn.com',
         to: email,
@@ -129,7 +146,7 @@ async function resendApplePass(
         <!-- Header -->
         <tr>
           <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
-            <img src="https://savronmn.com/logo.png" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
+            <img src="${logoSrc}" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
             <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
           </td>
         </tr>
@@ -166,10 +183,7 @@ async function resendApplePass(
   </table>
 </body>
 </html>`,
-        attachments: [{
-            filename: `${name.replace(/\s+/g, '_')}_savron_pass.pkpass`,
-            content: passBuffer,
-        }],
+        attachments: emailAttachments,
     });
 }
 

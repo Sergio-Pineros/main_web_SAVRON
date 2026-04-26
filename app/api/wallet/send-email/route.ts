@@ -26,6 +26,51 @@ function getSupabaseAdmin() {
     );
 }
 
+// Ensure the GenericClass exists in Google Wallet (required before creating objects)
+let classEnsured = false;
+async function ensureGooglePassClass(): Promise<void> {
+    if (classEnsured || !ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return;
+
+    const auth = new GoogleAuth({
+        credentials: { client_email: SERVICE_ACCOUNT_EMAIL, private_key: GOOGLE_PRIVATE_KEY },
+        scopes: ['https://www.googleapis.com/auth/wallet_object.issuer'],
+    });
+    const client = await auth.getClient();
+
+    // Check if class already exists
+    try {
+        await client.request({
+            url: `https://walletobjects.googleapis.com/walletobjects/v1/genericClass/${CLASS_ID}`,
+            method: 'GET',
+        });
+        classEnsured = true;
+        return;
+    } catch (err: any) {
+        if (err?.response?.status !== 404) {
+            console.error('Error checking Google Wallet class:', err?.response?.data || err);
+            classEnsured = true; // Don't retry on non-404 errors
+            return;
+        }
+    }
+
+    // Class doesn't exist — create it
+    try {
+        await client.request({
+            url: `https://walletobjects.googleapis.com/walletobjects/v1/genericClass`,
+            method: 'POST',
+            data: {
+                id: CLASS_ID,
+                issuerName: 'SAVRON Barbershop & Lounge',
+                reviewStatus: 'UNDER_REVIEW',
+            },
+        });
+        console.log('Google Wallet class created:', CLASS_ID);
+        classEnsured = true;
+    } catch (err: any) {
+        console.error('Failed to create Google Wallet class:', err?.response?.data || err);
+    }
+}
+
 async function createGooglePassObject(
     objectId: string,
     name: string,
@@ -33,6 +78,9 @@ async function createGooglePassObject(
     visitCount: number
 ): Promise<void> {
     if (!ISSUER_ID || !SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY || !CLASS_ID) return;
+
+    // Ensure the class exists first
+    await ensureGooglePassClass();
 
     const auth = new GoogleAuth({
         credentials: {
@@ -45,11 +93,25 @@ async function createGooglePassObject(
     const client = await auth.getClient();
     const passObject = buildGooglePassObject(objectId, name, email, visitCount);
 
-    await client.request({
-        url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject`,
-        method: 'POST',
-        data: passObject,
-    });
+    // Try to create; if it already exists (409), patch it instead
+    try {
+        await client.request({
+            url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject`,
+            method: 'POST',
+            data: passObject,
+        });
+    } catch (err: any) {
+        if (err?.response?.status === 409) {
+            // Object already exists — update it
+            await client.request({
+                url: `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`,
+                method: 'PATCH',
+                data: passObject,
+            });
+        } else {
+            throw err;
+        }
+    }
 }
 
 function buildGooglePassObject(
@@ -58,20 +120,23 @@ function buildGooglePassObject(
     email: string,
     visitCount: number
 ) {
+    const logoUrl = process.env.GOOGLE_WALLET_LOGO_URL || 'https://savronmn.com/logo.png';
     return {
         id: objectId,
         classId: CLASS_ID,
+        state: 'ACTIVE',
         genericType: 'GENERIC_TYPE_UNSPECIFIED',
-        hexBackgroundColor: '#141412',
+        hexBackgroundColor: '#0D3B4F',
         logo: {
-            sourceUri: { uri: process.env.GOOGLE_WALLET_LOGO_URL || 'https://savronmn.com/logo.png' },
+            sourceUri: { uri: logoUrl },
+            contentDescription: { defaultValue: { language: 'en-US', value: 'SAVRON Logo' } },
         },
         cardTitle: { defaultValue: { language: 'en-US', value: 'SAVRON' } },
-        header: { defaultValue: { language: 'en-US', value: 'SAVRON MEMBER' } },
-        primaryFields: [{ id: 'name', label: 'NAME', value: name }],
-        secondaryFields: [
-            { id: 'visits', label: 'VISITS', value: visitCount.toString() },
-            { id: 'email', label: 'EMAIL', value: email },
+        header: { defaultValue: { language: 'en-US', value: name } },
+        subheader: { defaultValue: { language: 'en-US', value: 'MEMBER' } },
+        textModulesData: [
+            { id: 'visits', header: 'VISITS', body: visitCount.toString() },
+            { id: 'email', header: 'EMAIL', body: email },
         ],
         barcode: { type: 'QR_CODE', value: email },
     };
@@ -217,15 +282,34 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const attachments = applePassBuffer
-            ? [{ filename: `${name.trim().replace(/\s+/g, '_')}_savron_pass.pkpass`, content: applePassBuffer }]
-            : [];
+        // Build attachments: logo (inline) + Apple pass (if generated)
+        const logoPath = path.join(process.cwd(), 'public', 'logo.png');
+        const logoBuffer = fs.existsSync(logoPath) ? fs.readFileSync(logoPath) : null;
+
+        const attachments: Array<{ filename: string; content: Buffer; content_id?: string }> = [];
+        
+        // Inline logo for email header
+        if (logoBuffer) {
+            attachments.push({
+                filename: 'logo.png',
+                content: logoBuffer,
+                content_id: 'savron_logo',
+            });
+        }
+
+        // Apple Wallet pass
+        if (applePassBuffer) {
+            attachments.push({
+                filename: `${name.trim().replace(/\s+/g, '_')}_savron_pass.pkpass`,
+                content: applePassBuffer,
+            });
+        }
 
         await resend.emails.send({
             from: process.env.RESEND_FROM_EMAIL || 'noreply@savronmn.com',
             to: email.trim(),
             subject: 'SAVRON — Your Membership Pass',
-            html: buildEmailHtml(name.trim(), googleSaveUrl),
+            html: buildEmailHtml(name.trim(), googleSaveUrl, !!logoBuffer),
             attachments,
         });
 
@@ -240,8 +324,9 @@ export async function POST(req: NextRequest) {
     }
 }
 
-function buildEmailHtml(name: string, googleSaveUrl: string | null): string {
+function buildEmailHtml(name: string, googleSaveUrl: string | null, hasInlineLogo: boolean = false): string {
     const firstName = name.split(' ')[0];
+    const logoSrc = hasInlineLogo ? 'cid:savron_logo' : 'https://savronmn.com/logo.png';
 
     const googleBtn = googleSaveUrl
         ? `<a href="${googleSaveUrl}" style="display:block;text-align:center;background:#0D3B4F;color:#fff;padding:14px 28px;text-decoration:none;font-family:Arial,sans-serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;font-weight:700;">Save to Google Wallet &rarr;</a>`
@@ -257,7 +342,7 @@ function buildEmailHtml(name: string, googleSaveUrl: string | null): string {
         <!-- Header -->
         <tr>
           <td style="background:#0D3B4F;padding:28px 32px;text-align:center;">
-            <img src="https://savronmn.com/logo.png" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
+            <img src="${logoSrc}" alt="SAVRON" width="160" style="display:block;margin:0 auto 8px;max-width:160px;height:auto;" />
             <p style="margin:0;color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;">Barbershop &amp; Lounge · Minneapolis</p>
           </td>
         </tr>
