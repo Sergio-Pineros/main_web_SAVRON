@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Montserrat, Inter } from 'next/font/google';
+import { Montserrat, Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import LayoutShell from '@/components/layout/LayoutShell';
 
@@ -15,6 +15,12 @@ const inter = Inter({
     display: 'swap',
 });
 
+const playfair = Playfair_Display({
+    subsets: ['latin'],
+    variable: '--font-playfair',
+    display: 'swap',
+});
+
 export const metadata: Metadata = {
     title: 'SAVRON | Luxury Barbershop Minneapolis',
     description: 'Experience the art of grooming at SAVRON. A members-only club atmosphere for the modern gentleman in Minneapolis.',
@@ -27,7 +33,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" className="scroll-smooth">
-            <body className={`${montserrat.variable} ${inter.variable} font-sans bg-savron-black text-white antialiased`}>
+            <body className={`${montserrat.variable} ${inter.variable} ${playfair.variable} font-sans bg-savron-black text-white antialiased`}>
                 <LayoutShell>
                     {children}
                 </LayoutShell>
