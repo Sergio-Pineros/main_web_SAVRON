@@ -50,7 +50,8 @@ export default function AdminDashboard() {
                 const todayCompleted = todayAll.filter(b => b.status === 'completed');
 
                 const todayRevenue = todayCompleted.reduce((sum, b) => {
-                    const price = parseFloat((b.price || '$0').replace(/[^0-9.]/g, ''));
+                    const priceStr = String(b.price || '$0');
+                    const price = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
                     return sum + (isNaN(price) ? 0 : price);
                 }, 0);
 
@@ -104,7 +105,8 @@ export default function AdminDashboard() {
         );
     }
 
-    const todayStr = format(new Date(), 'EEEE, MMMM d');
+    let todayStr = 'Today';
+    try { todayStr = format(new Date(), 'EEEE, MMMM d'); } catch {}
 
     return (
         <div className="space-y-8 entry-fade">

@@ -239,6 +239,37 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, visit_count: newCount });
         }
 
+        if (action === 'remove_visit') {
+            const newCount = Math.max(0, subscriber.visit_count - 1);
+
+            const { error: updateError } = await supabase
+                .from('email_subscribers')
+                .update({
+                    visit_count: newCount,
+                })
+                .eq('id', subscriber_id);
+
+            if (updateError) {
+                return NextResponse.json({ error: 'Failed to update visit count' }, { status: 500 });
+            }
+
+            // Update Google Wallet pass live on device
+            if (subscriber.google_pass_object_id) {
+                try {
+                    await updateGoogleWalletPass(
+                        subscriber.google_pass_object_id,
+                        subscriber.name,
+                        subscriber.email,
+                        newCount
+                    );
+                } catch (err) {
+                    console.error('Google Wallet update failed (non-fatal):', err);
+                }
+            }
+
+            return NextResponse.json({ success: true, visit_count: newCount });
+        }
+
         if (action === 'send_updated_pass') {
             try {
                 await resendApplePass(

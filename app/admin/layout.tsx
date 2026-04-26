@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { Users, Scissors, Calendar, LayoutDashboard, LogOut, MonitorPlay, CreditCard } from 'lucide-react';
+import { Users, Scissors, Calendar, LayoutDashboard, LogOut, MonitorPlay, CreditCard, Mail } from 'lucide-react';
 
 const navItems = [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -14,6 +14,7 @@ const navItems = [
     { label: 'Clients', href: '/admin/clients', icon: Users },
     { label: 'Bookings', href: '/admin/bookings', icon: Calendar },
     { label: 'Membership', href: '/admin/membership', icon: CreditCard },
+    { label: 'Communications', href: '/admin/communications', icon: Mail },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

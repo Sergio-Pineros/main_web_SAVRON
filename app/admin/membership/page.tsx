@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { EmailSubscriber } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserCheck, Clock, Send, Plus, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Search, UserCheck, Clock, Send, Plus, RefreshCw, UserPlus, X, Minus, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function MembershipPage() {
@@ -87,6 +87,52 @@ export default function MembershipPage() {
                 showToast(`Visit recorded — ${subscriber.name} now has ${data.visit_count} visit${data.visit_count === 1 ? '' : 's'}. Google Wallet updated.`);
             } else {
                 showToast(data.error || 'Failed to record visit', 'error');
+            }
+        } catch {
+            showToast('Network error', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function removeVisit(subscriber: EmailSubscriber) {
+        if (subscriber.visit_count <= 0) return;
+        setActionLoading(`remove-visit-${subscriber.id}`);
+        try {
+            const res = await fetch('/api/wallet/record-visit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriber_id: subscriber.id, action: 'remove_visit' }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setSubscribers(prev =>
+                    prev.map(s => s.id === subscriber.id
+                        ? { ...s, visit_count: data.visit_count }
+                        : s
+                    )
+                );
+                showToast(`Visit removed — ${subscriber.name} now has ${data.visit_count} visit${data.visit_count === 1 ? '' : 's'}. Google Wallet updated.`);
+            } else {
+                showToast(data.error || 'Failed to remove visit', 'error');
+            }
+        } catch {
+            showToast('Network error', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function deleteMember(subscriber: EmailSubscriber) {
+        if (!confirm(`Are you sure you want to permanently delete ${subscriber.name}? This removes them from the CRM and they will lose access to their pass.`)) return;
+        setActionLoading(`delete-${subscriber.id}`);
+        try {
+            const { error } = await supabase.from('email_subscribers').delete().eq('id', subscriber.id);
+            if (error) {
+                showToast('Failed to delete member', 'error');
+            } else {
+                setSubscribers(prev => prev.filter(s => s.id !== subscriber.id));
+                showToast(`Member ${subscriber.name} deleted successfully.`);
             }
         } catch {
             showToast('Network error', 'error');
@@ -282,7 +328,7 @@ export default function MembershipPage() {
                     <div className="border border-white/[0.07]">
                         {/* Header row */}
                         <div className="grid gap-4 px-6 py-3 border-b border-white/[0.05]"
-                            style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 160px" }}
+                            style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 240px" }}
                         >
                             {['Name', 'Email', 'Phone', 'Visits', 'Joined', 'Actions'].map(h => (
                                 <p key={h} className="text-[9px] uppercase tracking-[0.3em] text-white/25">{h}</p>
@@ -297,7 +343,7 @@ export default function MembershipPage() {
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: i * 0.03 }}
                                 className="grid gap-4 px-6 py-5 border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors items-center"
-                                style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 160px" }}
+                                style={{ gridTemplateColumns: "2fr 2fr 1fr 80px 80px 240px" }}
                             >
                                 {/* Name */}
                                 <div>
@@ -326,7 +372,15 @@ export default function MembershipPage() {
                                 </p>
 
                                 {/* Actions */}
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        onClick={() => removeVisit(subscriber)}
+                                        disabled={actionLoading === `remove-visit-${subscriber.id}` || subscriber.visit_count <= 0}
+                                        title="Remove visit (-1 count)"
+                                        className="flex items-center justify-center w-7 h-7 text-white/50 border border-white/[0.1] rounded-full hover:border-yellow-500/40 hover:text-yellow-400 hover:bg-yellow-500/10 transition-all disabled:opacity-40"
+                                    >
+                                        <Minus size={10} />
+                                    </button>
                                     <button
                                         onClick={() => recordVisit(subscriber)}
                                         disabled={actionLoading === `visit-${subscriber.id}`}
@@ -344,6 +398,14 @@ export default function MembershipPage() {
                                     >
                                         <Send size={10} />
                                         {actionLoading === `pass-${subscriber.id}` ? '…' : 'Pass'}
+                                    </button>
+                                    <button
+                                        onClick={() => deleteMember(subscriber)}
+                                        disabled={actionLoading === `delete-${subscriber.id}`}
+                                        title="Delete Member"
+                                        className="flex items-center justify-center w-7 h-7 text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-all disabled:opacity-40 ml-1"
+                                    >
+                                        <Trash2 size={12} />
                                     </button>
                                 </div>
                             </motion.div>

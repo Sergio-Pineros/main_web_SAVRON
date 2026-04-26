@@ -110,5 +110,36 @@ export async function POST(request: NextRequest) {
     // Store the Google event ID in the booking for future updates/deletes
     await getAdmin().from('bookings').update({ google_event_id: eventId }).eq('id', bookingId);
 
+    // Sync client to clients table
+    if (booking.client_name) {
+        // Try to find existing client by email or phone
+        let query = supabaseAdmin.from('clients').select('id, total_visits, total_spent').eq('name', booking.client_name);
+        if (booking.client_email) query = query.or(`email.eq.${booking.client_email}`);
+        
+        const { data: existingClients } = await query;
+        const existing = existingClients?.[0];
+
+        const priceNum = parseFloat(String(booking.price || '0').replace(/[^0-9.]/g, '')) || 0;
+
+        if (existing) {
+            await supabaseAdmin.from('clients').update({
+                last_booking_date: booking.date,
+                total_visits: (existing.total_visits || 0) + 1,
+                total_spent: (existing.total_spent || 0) + priceNum,
+                phone: booking.client_phone || undefined,
+                email: booking.client_email || undefined,
+            }).eq('id', existing.id);
+        } else {
+            await supabaseAdmin.from('clients').insert({
+                name: booking.client_name,
+                email: booking.client_email || null,
+                phone: booking.client_phone || null,
+                last_booking_date: booking.date,
+                total_visits: 1,
+                total_spent: priceNum,
+            });
+        }
+    }
+
     return NextResponse.json({ success: true, eventId });
 }

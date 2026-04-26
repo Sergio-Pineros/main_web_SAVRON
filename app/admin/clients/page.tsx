@@ -82,17 +82,29 @@ export default function ClientsPage() {
         const now = new Date();
         return clients.filter(c => {
             if (!c.last_booking_date) return true;
-            return differenceInWeeks(now, new Date(c.last_booking_date)) >= weeks;
+            try {
+                const date = new Date(c.last_booking_date);
+                if (isNaN(date.getTime())) return true;
+                return differenceInWeeks(now, date) >= weeks;
+            } catch {
+                return true;
+            }
         });
     }, [clients, visitFilter]);
 
     function getLastVisitInfo(client: Client) {
         if (!client.last_booking_date) return { text: 'Never', color: 'text-savron-silver/40' };
-        const weeks = differenceInWeeks(new Date(), new Date(client.last_booking_date));
-        const text = formatDistanceToNow(new Date(client.last_booking_date), { addSuffix: true });
-        if (weeks < 4) return { text, color: 'text-savron-green' };
-        if (weeks < 6) return { text, color: 'text-yellow-400' };
-        return { text, color: 'text-red-400' };
+        try {
+            const date = new Date(client.last_booking_date);
+            if (isNaN(date.getTime())) return { text: 'Invalid Date', color: 'text-savron-silver/40' };
+            const weeks = differenceInWeeks(new Date(), date);
+            const text = formatDistanceToNow(date, { addSuffix: true });
+            if (weeks < 4) return { text, color: 'text-savron-green' };
+            if (weeks < 6) return { text, color: 'text-yellow-400' };
+            return { text, color: 'text-red-400' };
+        } catch {
+            return { text: 'Unknown', color: 'text-savron-silver/40' };
+        }
     }
 
     async function addClient(e: React.FormEvent) {
